@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	<link rel="stylesheet" href="css/styles.css">
+	<title>Multiplayer Survival</title>
+</head>
+
+<body>
+	<!-- auth modals -->
+	<div class="auth">
+		<div class="modal">
+			<h2>Login</h2>
+			<form class="login">
+				<input type="text" name="email" placeholder="Email">
+				<input type="password" name="password" placeholder="Password">
+				<button>Login</button>
+				<p class="error"></p>
+			</form>
+			<button class="play-anon">Play Anonymously</button>
+			<div>No account? <a class="switch">Register instead</a></div>
+		</div>
+		<div class="modal">
+			<h2>Register</h2>
+			<form class="register">
+				<input type="text" name="email" placeholder="Email">
+				<input type="password" name="password" placeholder="Password">
+				<button>Register</button>
+				<p class="error"></p>
+			</form>
+			<div>Got an account? <a class="switch">Login instead</a></div>
+		</div>
+	</div>
+
+	<header>
+		<nav>
+			<a class="sign-inout">Sign In</a>
+		</nav>
+	</header>
+
+	<section class="content">
+		<!-- contains the three.js renderer -->
+	</section>
+
+	<!-- import firebase SDKs -->
+	<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+	<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
+	<script>
+		// app configs for server
+		const firebaseConfig = {
+			apiKey: "AIzaSyC-lUHg2rklhe5g0hMSqOiAHpwexMeFmz4",
+			authDomain: "survival-multiplayer-gam-7330d.firebaseapp.com",
+			databaseURL: "https://survival-multiplayer-gam-7330d-default-rtdb.firebaseio.com",
+			projectId: "survival-multiplayer-gam-7330d",
+			storageBucket: "survival-multiplayer-gam-7330d.appspot.com",
+			messagingSenderId: "359326474554",
+			appId: "1:359326474554:web:29f14d830d562dcc21f003"
+		};
+
+		// Initialize Firebase
+		firebase.initializeApp(firebaseConfig);
+	</script>
+
+	<script src="js/auth.js"></script>
+	<script src="js/input.js"></script>
+	<script src="js/game.js" type="module"></script>
+</body>
+</html>
