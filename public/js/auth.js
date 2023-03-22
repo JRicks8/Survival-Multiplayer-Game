@@ -51,7 +51,6 @@ loginForm.addEventListener("submit", e => {
   auth.signInWithEmailAndPassword(email, password)
     .then(user => {
       console.log("logged in", user);
-      auth.setPersistence(auth.Auth.Persistence.LOCAL);
       loginForm.reset();
     })
     .catch(error => {
@@ -64,7 +63,6 @@ playAnon.addEventListener("click", () => {
   auth.signInAnonymously()
   .then(user => {
     console.log("logged in anonymously", user);
-    auth.setPersistence(firebase.auth().Auth.Persistence.NONE);
     loginForm.reset();
   })
   .catch(error => {
