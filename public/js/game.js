@@ -11,6 +11,156 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// make this object because in the voxel editor, we are given only position and hex color,
+// so use the hex color in the editor to convert to tile indices.
+// I do this for faster lookup when parsing sample world data
+const hexIndex = new Map();
+hexIndex.set("000000", 1);
+hexIndex.set("847e87", 2);
+hexIndex.set("8f563b", 3);
+hexIndex.set("6abe30", 4);
+
+// create geo for tiles
+const standardTileGeo = new THREE.BoxGeometry(1, 1, 1);
+
+// the tileref has an array of all of the possible tiles
+const tileRef = [
+  {//0
+    name: "air",
+    material: new THREE.MeshBasicMaterial({ opacity: 0 }),
+    geometry: standardTileGeo,
+    opaque: false,
+  },
+  {//1
+    name: "banded iron",
+    material: new THREE.MeshBasicMaterial({ color: 0x000000 }),
+    geometry: standardTileGeo,
+    opaque: true
+  },
+  {//2
+    name: "stone",
+    material: new THREE.MeshBasicMaterial({ color: 0x847E87 }),
+    geometry: standardTileGeo,
+    opaque: true
+  },
+  {//3
+    name: "dirt",
+    material: new THREE.MeshBasicMaterial({ color: 0x8F563B }),
+    geometry: standardTileGeo,
+    opaque: true
+  },
+  {//4
+    name: "grass",
+    material: new THREE.MeshBasicMaterial({ color: 0x6ABE30 }),
+    geometry: standardTileGeo,
+    opaque: true
+  },
+];
+
+class Block {
+  constructor(tId = 0, pos = new THREE.Vector3()) {
+    this.tId = tId;
+    const t = tileRef[tId];
+    this.mesh = new THREE.Mesh(t.geometry, t.material)
+    this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2));
+  }
+
+  setPosition(pos) {
+    this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2))
+  }
+
+  addToScene(s) {
+    s.add(this.mesh);
+  }
+
+  removeFromScene(s) {
+    s.remove(this.mesh);
+  }
+}
+
+/** Wave Function Collapse Algorithm, used for world generation */
+class WFC {
+  /** init params for world generation */
+  constructor() {
+  }
+
+  /** generates the world using the WFC */
+  generate(file, n = 3) {
+    // 1: read input, store every NxN pattern and count occurences
+    let worldData = this.parseWorldText(file);
+    worldData.then(() => {
+      console.log(worldData);
+    })
+
+    // 2: store every possible adjacency pattern
+
+    // 3: create 3d array (called w for wave). Each element holds an array
+    // of bools determining the state of each stored pattern. At start, all
+    // bools are true because every pattern is initially possible.
+
+    // 4: create 3d array (called h). each element holds a float that is the
+    // "entropy" value of the corresponding cell in output.
+    // calculate entropy via the shannon formula, the input being the number
+    // of true values in the wave cell (w[n]).
+    // Initial entropy of all wave cells are the same.
+
+    // 5: find cell with minimum non-zero entropy (first iteration is random)
+    // out of valid patterns (true values) pick one randomly, weighted by that
+    // pattern's occurences.
+
+    // 6: assign the selected pattern to the cell with minimum entropy (every
+    // pattern bool in the wave cell is false except for the chosen one)
+
+    // 7: assigning a pattern to a tile has effects on neighboring tiles. using
+    // the adjacency patterns in step 2, adjust possible patterns in neighboring
+    // tiles. this is of course recursive and should be propagated to all tiles.
+    // IF THERE ARE NO POSSIBLE PATTERNS IN ANY NEIGHBORS, the program must be stopped.
+
+    // 8: recalculate entropy.
+
+    // repeat steps 5-8 until all cells have collapsed.
+  }
+
+  // .txt world format: "X Z Y 000000"
+  async parseWorldText(file) {
+    // parse world sample text into usable game data
+    // js is annoying, wish I could just do output[6][40][6];
+    let output = new Array(6).fill(
+      new Array(40).fill(
+        new Array(6).fill(0)
+      )
+    );
+    await fetch("../sample-world-0.txt")
+    .then(response => response.text())
+    .then(text => {
+      const lines = text.split('\n');
+      // first, fill the array with air tiles
+      for (let i = 0; i < output.length; i++) {
+        for (let j = 0; j < output[i].length; j++) {
+          for (let k = 0; k < output[i][j].length; k++) {
+            output[i][j][k] = new Block(0, new THREE.Vector3(i, j, k));
+          }
+        }
+      }
+
+      // then, set existing tiles
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line[0] === '#') continue;
+        let vals = line.split(' ');
+        let outPos = new THREE.Vector3(parseInt(vals[0]), parseInt(vals[2]), parseInt(vals[1])); // z-up -> y-up
+        let tId = hexIndex.get(String(vals[3]));
+        if (tId == null) {
+          //console.log(`ERR: tile id not found from hex code ${vals[3]}. Tile will be air.`);
+          tId = 0;
+        }
+        output[outPos.getComponent(0)][outPos.getComponent(1)][outPos.getComponent(2)] = new Block(tId, outPos);
+      }
+    });
+    return output;
+  }
+}
+
 class Character {
   constructor() {
     const boxGeo = new THREE.BoxGeometry(1, 2, 1);
@@ -172,6 +322,10 @@ function initGame() {
 function runGame() {
   // basic world setup
   const contentWrapper = document.querySelector(".content");
+
+  // generate world
+  const wfc = new WFC();
+  wfc.generate("../sample-world-0.txt");
 
   //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
