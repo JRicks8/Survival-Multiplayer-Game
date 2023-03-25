@@ -82,43 +82,43 @@ const standardTileGeo = new THREE.BufferGeometry();
 const blockRef = [
   {//0
     name: "air",
-    material: new THREE.MeshLambertMaterial({ transparent: true, opacity: 0 }),
+    material: new THREE.MeshLambertMaterial({transparent: true, opacity: 0}),
     geometry: standardTileGeo,
     opaque: false,
   },
   {//1
     name: "banded iron",
-    material: new THREE.MeshLambertMaterial({ color: 0x000000 }),
+    material: new THREE.MeshLambertMaterial({color: 0x000000}),
     geometry: standardTileGeo,
     opaque: true
   },
   {//2
     name: "stone",
-    material: new THREE.MeshLambertMaterial({ color: 0x847E87 }),
+    material: new THREE.MeshLambertMaterial({color: 0x847E87}),
     geometry: standardTileGeo,
     opaque: true
   },
   {//3
     name: "dirt",
-    material: new THREE.MeshLambertMaterial({ color: 0x8F563B }),
+    material: new THREE.MeshLambertMaterial({color: 0x8F563B}),
     geometry: standardTileGeo,
     opaque: true
   },
   {//4
     name: "grass",
-    material: new THREE.MeshLambertMaterial({ color: 0x6ABE30 }),
+    material: new THREE.MeshLambertMaterial({color: 0x6ABE30}),
     geometry: standardTileGeo,
     opaque: true
   },
 ];
 
 class Block {
-  constructor(bId = 0, pos = new THREE.Vector3(0,0,0)) {
+  constructor(bId = 0, pos = new THREE.Vector3(0, 0, 0)) {
     this.bId = bId;
     const b = blockRef[bId];
     this.mesh = new THREE.Mesh(b.geometry, b.material)
     this.mesh.position.setX(pos.x);
-    this.mesh.position.setY(pos.y - 20);
+    this.mesh.position.setY(pos.y);
     this.mesh.position.setZ(pos.z);
   }
 
@@ -146,17 +146,78 @@ class WFC {
   generate(file, n = 3) {
     // 1: read input, store every NxNxN pattern and count occurences
     this.parseWorldText(file).then(data => {
-      for (let x = 0; x < data.length; x++) {
-        for (let y = 0; y < data[x].length; y++) {
-          for (let z = 0; z < data[x][y].length; z++) {
-            data[x][y][z].addToScene(scene);
+      const WIDTH = data.length;
+      const HEIGHT = data[0].length;
+      const DEPTH = data[0][0].length;
+      // 2: store every possible pattern and their adjacencies
+      let patterns = new Array(WIDTH * HEIGHT * DEPTH);
+      // init pattern objects
+      for (let i = 0; i < patterns.length; i++) {
+        patterns[i] = {
+          // arrays reference blocks in data, NOT COPIES
+          data: [],
+          adjacent: [], // stores references to other patterns. goes FRONT BACK TOP RIGHT DOWN LEFT
+        }
+      }
+
+      let patternsIndex = 0;
+      for (let x = 0; x < WIDTH; x++) {
+        for (let y = 0; y < HEIGHT; y++) {
+          for (let z = 0; z < DEPTH; z++) {
+            // store an NxNxN chunk of blocks as a pattern.
+            // indices greater than the array size will wrap
+            for (let xoff = 0; xoff < n; xoff++) {
+              for (let yoff = 0; yoff < n; yoff++) {
+                for (let zoff = 0; zoff < n; zoff++) {
+                  let newx = x + xoff;
+                  let newy = y + yoff;
+                  let newz = z + zoff;
+                  newx -= WIDTH * (+ (newx >= WIDTH)); // wrap indices
+                  newy -= HEIGHT * (+ (newy >= HEIGHT));
+                  newz -= DEPTH * (+ (newz >= DEPTH));
+                  
+                  patterns[patternsIndex].data.push(data[newx][newy][newz]);
+                }
+              }
+            }
+
+            // now store adjacent patterns
+            let frontIndex = patternsIndex - 1 + DEPTH * (+ (patternsIndex % DEPTH === 0));
+            let backIndex = patternsIndex + 1 - DEPTH * (+ (patternsIndex + 1 % DEPTH === 0));
+            let topIndex = patternsIndex + DEPTH - DEPTH * HEIGHT * (+ ((patternsIndex + DEPTH) % (DEPTH * HEIGHT) <= DEPTH - 1));
+            let rightIndex = patternsIndex + DEPTH * HEIGHT - DEPTH * HEIGHT * WIDTH * (+ (patternsIndex + DEPTH * HEIGHT >= DEPTH * WIDTH * HEIGHT));
+            let bottomIndex = patternsIndex - DEPTH + DEPTH * HEIGHT * (+ ((patternsIndex - DEPTH) % (DEPTH * HEIGHT) >= DEPTH * HEIGHT - DEPTH)); // my brain hurts
+            let leftIndex = patternsIndex - DEPTH * HEIGHT + DEPTH * HEIGHT * WIDTH * (+ (patternsIndex - DEPTH * HEIGHT < 0));
+            patterns[patternsIndex].adjacent.push(patterns[frontIndex]);
+            patterns[patternsIndex].adjacent.push(patterns[backIndex]);
+            patterns[patternsIndex].adjacent.push(patterns[topIndex]);
+            patterns[patternsIndex].adjacent.push(patterns[rightIndex]);
+            patterns[patternsIndex].adjacent.push(patterns[bottomIndex]);
+            patterns[patternsIndex].adjacent.push(patterns[leftIndex]);
+            patternsIndex++;
           }
         }
       }
-    });
-    console.log("done adding blocks to scene");
 
-    // 2: store every possible adjacency pattern
+      // // add to scene (debug)
+      // for (let x = 0; x < WIDTH; x++) {
+      //   for (let y = 0; y < HEIGHT; y++) {
+      //     for (let z = 0; z < DEPTH; z++) {
+      //       data[x][y][z].addToScene(scene);
+      //     }
+      //   }
+      // }
+
+      // add pattern 0 to scene
+      for (let i = 0; i < patterns[0].data.length; i++) {
+        patterns[0].data[i].addToScene(scene);
+      }
+
+      // log all patterns base positions
+      for (let i = 0; i < patterns.length; i++) {
+        console.log(`${i}: ${patterns[i].data[0].mesh.position.toArray()}`);
+      }
+    });
 
     // 3: create 3d array (called w for wave). Each element holds an array
     // of bools determining the state of each stored pattern. At start, all
@@ -198,30 +259,30 @@ class WFC {
     }
 
     await fetch(file)
-    .then(response => response.text())
-    .then(text => {
-      const lines = text.split('\n');
+      .then(response => response.text())
+      .then(text => {
+        const lines = text.split('\n');
 
-      // set existing tiles
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line[0] === '#') continue;
-        let vals = line.split(' ');
-        let outPos = new THREE.Vector3(parseInt(vals[0]), parseInt(vals[2]), parseInt(vals[1])); // z-up -> y-up
-        vals[3] = vals[3].trim(); // remove invisible '\n' at end of string. This caused me hours of pain.
-        let bId = hexIndex.get(vals[3]);
-        if (bId == null) {
-          console.log(`ERR: tile id not found from hex code ${vals[3]}. Tile will be air.`);
-          bId = 0;
+        // set existing tiles
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line[0] === '#') continue;
+          let vals = line.split(' ');
+          let outPos = new THREE.Vector3(parseInt(vals[0]), parseInt(vals[2]), parseInt(vals[1])); // z-up -> y-up
+          vals[3] = vals[3].trim(); // remove invisible '\n' at end of string. This caused me hours of pain.
+          let bId = hexIndex.get(vals[3]);
+          if (bId == null) {
+            console.log(`ERR: tile id not found from hex code ${vals[3]}. Tile will be air.`);
+            bId = 0;
+          }
+          output[outPos.x][outPos.y][outPos.z] = new Block(bId, outPos);
         }
-        output[outPos.x][outPos.y][outPos.z] = new Block(bId, outPos);
-      }
-    });
+      });
 
     for (let i = 0; i < output.length; i++) {
       for (let j = 0; j < output[i].length; j++) {
         for (let k = 0; k < output[i][j].length; k++) {
-          if (output[ i ][ j ][ k ] == null) output[ i ][ j ][ k ] = new Block(0, new THREE.Vector3(i, j, k));
+          if (output[i][j][k] == null) output[i][j][k] = new Block(0, new THREE.Vector3(i, j, k));
         }
       }
     }
@@ -233,7 +294,7 @@ class WFC {
 class Character {
   constructor() {
     const boxGeo = new THREE.BoxGeometry(1, 2, 1);
-    const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
+    const playerMaterial = new THREE.MeshLambertMaterial({color: 0x00ff00});
     this.mesh = new THREE.Mesh(boxGeo, playerMaterial);
     this.mesh.position.setY(1);
 
@@ -321,7 +382,7 @@ auth.onAuthStateChanged(user => {
       });
       characterRef.onDisconnect().remove();
       characterRef.set({
-        position: [ 0, 0, 0 ],
+        position: [0, 0, 0],
       });
     }
     wrapper();
@@ -351,7 +412,7 @@ function initGame() {
     else currentSnapshot = Object.keys(snapshot.val());
 
     console.log("here are the character ids:")
-    for (const key of otherCharacters.keys()) { console.log(key) }
+    for (const key of otherCharacters.keys()) {console.log(key)}
 
     if (currentSnapshot == null) currentSnapshot = [];
     console.log("current snapshot", currentSnapshot);
@@ -402,7 +463,7 @@ function runGame() {
   let cameraOrigin = new THREE.Vector3();
   let camOffsetRotation = 0;
 
-  const renderer = new THREE.WebGLRenderer({ alpha: true });
+  const renderer = new THREE.WebGLRenderer({alpha: true});
   renderer.setSize(contentWrapper.clientWidth, contentWrapper.clientHeight);
   contentWrapper.appendChild(renderer.domElement);
 
@@ -414,8 +475,8 @@ function runGame() {
   scene.add(directionalLight);
 
   // make materials
-  const materialLambert = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
-  const materialToon = new THREE.MeshToonMaterial({ color: 0x00ff00 });
+  const materialLambert = new THREE.MeshLambertMaterial({color: 0x00ff00});
+  const materialToon = new THREE.MeshToonMaterial({color: 0x00ff00});
 
   // add geometry
 
@@ -445,8 +506,8 @@ function runGame() {
       dir.setY(0);
       movePlayer(dir.multiplyScalar(clientCharacter.speed * dt));
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyA", {
@@ -456,8 +517,8 @@ function runGame() {
       let right = dir.cross(new THREE.Vector3(0, 1, 0));
       movePlayer(right.multiplyScalar(-clientCharacter.speed * dt));
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyS", {
@@ -467,8 +528,8 @@ function runGame() {
       dir.setY(0);
       movePlayer(dir.multiplyScalar(-clientCharacter.speed * dt));
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyD", {
@@ -478,8 +539,8 @@ function runGame() {
       let right = dir.cross(new THREE.Vector3(0, 1, 0));
       movePlayer(right.multiplyScalar(clientCharacter.speed * dt));
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyQ", {
@@ -487,8 +548,8 @@ function runGame() {
     downFunction: dt => {
       camOffsetRotation += 3 * dt;
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyE", {
@@ -496,8 +557,8 @@ function runGame() {
     downFunction: dt => {
       camOffsetRotation -= 3 * dt;
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   // aux variables
