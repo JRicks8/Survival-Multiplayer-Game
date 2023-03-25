@@ -21,52 +21,109 @@ hexIndex.set("8f563b", 3);
 hexIndex.set("6abe30", 4);
 
 // create geo for tiles
-const standardTileGeo = new THREE.BoxGeometry(1, 1, 1);
+const standardTileGeo = new THREE.BufferGeometry();
+// standardTileGeo vertex buffer & index buffer
+{
+  const vertexBuffer = new THREE.InterleavedBuffer(new Float32Array([
+    // Front
+    -0.5, 0.5, 0.5, 0, 0, -1, 0, 1,
+    0.5, 0.5, 0.5, 0, 0, -1, 1, 1,
+    -0.5, -0.5, 0.5, 0, 0, -1, 0, 0,
+    0.5, -0.5, 0.5, 0, 0, -1, 1, 0,
+    // Back
+    0.5, 0.5, -0.5, 0, 0, 1, 0, 1,
+    -0.5, 0.5, -0.5, 0, 0, 1, 1, 1,
+    0.5, -0.5, -0.5, 0, 0, 1, 0, 0,
+    -0.5, -0.5, -0.5, 0, 0, 1, 1, 0,
+    // Left
+    -0.5, 0.5, -0.5, -1, 0, 0, 0, 1,
+    -0.5, 0.5, 0.5, -1, 0, 0, 1, 1,
+    -0.5, -0.5, -0.5, -1, 0, 0, 0, 0,
+    -0.5, -0.5, 0.5, -1, 0, 0, 1, 0,
+    // Right
+    0.5, 0.5, 0.5, 1, 0, 0, 0, 1,
+    0.5, 0.5, -0.5, 1, 0, 0, 1, 1,
+    0.5, -0.5, 0.5, 1, 0, 0, 0, 0,
+    0.5, -0.5, -0.5, 1, 0, 0, 1, 0,
+    // Top
+    -0.5, 0.5, 0.5, 0, 1, 0, 0, 1,
+    0.5, 0.5, 0.5, 0, 1, 0, 1, 1,
+    -0.5, 0.5, -0.5, 0, 1, 0, 0, 0,
+    0.5, 0.5, -0.5, 0, 1, 0, 1, 0,
+    // Bottom
+    0.5, -0.5, 0.5, 0, -1, 0, 1, 0,
+    -0.5, -0.5, 0.5, 0, -1, 0, 0, 0,
+    0.5, -0.5, -0.5, 0, -1, 0, 1, 1,
+    -0.5, -0.5, -0.5, 0, -1, 0, 0, 1,
+  ]), 8);
+
+  const indices = new Uint16Array([
+    0, 2, 1,
+    2, 3, 1,
+    4, 6, 5,
+    6, 7, 5,
+    8, 10, 9,
+    10, 11, 9,
+    12, 14, 13,
+    14, 15, 13,
+    16, 17, 18,
+    18, 17, 19,
+    20, 21, 22,
+    22, 21, 23
+  ]);
+
+  standardTileGeo.setIndex(new THREE.BufferAttribute(indices, 1));
+  standardTileGeo.setAttribute("position", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 0));
+  standardTileGeo.setAttribute("normal", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 3));
+  standardTileGeo.setAttribute("uv", new THREE.InterleavedBufferAttribute(vertexBuffer, 6, 2));
+}
 
 // the tileref has an array of all of the possible tiles
-const tileRef = [
+const blockRef = [
   {//0
     name: "air",
-    material: new THREE.MeshBasicMaterial({ opacity: 0 }),
+    material: new THREE.MeshLambertMaterial({ transparent: true, opacity: 0 }),
     geometry: standardTileGeo,
     opaque: false,
   },
   {//1
     name: "banded iron",
-    material: new THREE.MeshBasicMaterial({ color: 0x000000 }),
+    material: new THREE.MeshLambertMaterial({ color: 0x000000 }),
     geometry: standardTileGeo,
     opaque: true
   },
   {//2
     name: "stone",
-    material: new THREE.MeshBasicMaterial({ color: 0x847E87 }),
+    material: new THREE.MeshLambertMaterial({ color: 0x847E87 }),
     geometry: standardTileGeo,
     opaque: true
   },
   {//3
     name: "dirt",
-    material: new THREE.MeshBasicMaterial({ color: 0x8F563B }),
+    material: new THREE.MeshLambertMaterial({ color: 0x8F563B }),
     geometry: standardTileGeo,
     opaque: true
   },
   {//4
     name: "grass",
-    material: new THREE.MeshBasicMaterial({ color: 0x6ABE30 }),
+    material: new THREE.MeshLambertMaterial({ color: 0x6ABE30 }),
     geometry: standardTileGeo,
     opaque: true
   },
 ];
 
 class Block {
-  constructor(tId = 0, pos = new THREE.Vector3()) {
-    this.tId = tId;
-    const t = tileRef[tId];
-    this.mesh = new THREE.Mesh(t.geometry, t.material)
-    this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2));
+  constructor(bId = 0, pos = new THREE.Vector3(0,0,0)) {
+    this.bId = bId;
+    const b = blockRef[bId];
+    this.mesh = new THREE.Mesh(b.geometry, b.material)
+    this.mesh.position.setX(pos.x);
+    this.mesh.position.setY(pos.y - 20);
+    this.mesh.position.setZ(pos.z);
   }
 
   setPosition(pos) {
-    this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2))
+    this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2));
   }
 
   addToScene(s) {
@@ -82,15 +139,22 @@ class Block {
 class WFC {
   /** init params for world generation */
   constructor() {
+
   }
 
   /** generates the world using the WFC */
   generate(file, n = 3) {
-    // 1: read input, store every NxN pattern and count occurences
-    let worldData = this.parseWorldText(file);
-    worldData.then(() => {
-      console.log(worldData);
-    })
+    // 1: read input, store every NxNxN pattern and count occurences
+    this.parseWorldText(file).then(data => {
+      for (let x = 0; x < data.length; x++) {
+        for (let y = 0; y < data[x].length; y++) {
+          for (let z = 0; z < data[x][y].length; z++) {
+            data[x][y][z].addToScene(scene);
+          }
+        }
+      }
+    });
+    console.log("done adding blocks to scene");
 
     // 2: store every possible adjacency pattern
 
@@ -125,38 +189,43 @@ class WFC {
   async parseWorldText(file) {
     // parse world sample text into usable game data
     // js is annoying, wish I could just do output[6][40][6];
-    let output = new Array(6).fill(
-      new Array(40).fill(
-        new Array(6).fill(0)
-      )
-    );
-    await fetch("../sample-world-0.txt")
+    let output = new Array(6);
+    for (let i = 0; i < output.length; i++) {
+      output[i] = new Array(40);
+      for (let j = 0; j < output[i].length; j++) {
+        output[i][j] = new Array(6);
+      }
+    }
+
+    await fetch(file)
     .then(response => response.text())
     .then(text => {
       const lines = text.split('\n');
-      // first, fill the array with air tiles
-      for (let i = 0; i < output.length; i++) {
-        for (let j = 0; j < output[i].length; j++) {
-          for (let k = 0; k < output[i][j].length; k++) {
-            output[i][j][k] = new Block(0, new THREE.Vector3(i, j, k));
-          }
-        }
-      }
 
-      // then, set existing tiles
+      // set existing tiles
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line[0] === '#') continue;
         let vals = line.split(' ');
         let outPos = new THREE.Vector3(parseInt(vals[0]), parseInt(vals[2]), parseInt(vals[1])); // z-up -> y-up
-        let tId = hexIndex.get(String(vals[3]));
-        if (tId == null) {
-          //console.log(`ERR: tile id not found from hex code ${vals[3]}. Tile will be air.`);
-          tId = 0;
+        vals[3] = vals[3].trim(); // remove invisible '\n' at end of string. This caused me hours of pain.
+        let bId = hexIndex.get(vals[3]);
+        if (bId == null) {
+          console.log(`ERR: tile id not found from hex code ${vals[3]}. Tile will be air.`);
+          bId = 0;
         }
-        output[outPos.getComponent(0)][outPos.getComponent(1)][outPos.getComponent(2)] = new Block(tId, outPos);
+        output[outPos.x][outPos.y][outPos.z] = new Block(bId, outPos);
       }
     });
+
+    for (let i = 0; i < output.length; i++) {
+      for (let j = 0; j < output[i].length; j++) {
+        for (let k = 0; k < output[i][j].length; k++) {
+          if (output[ i ][ j ][ k ] == null) output[ i ][ j ][ k ] = new Block(0, new THREE.Vector3(i, j, k));
+        }
+      }
+    }
+
     return output;
   }
 }
@@ -349,10 +418,7 @@ function runGame() {
   const materialToon = new THREE.MeshToonMaterial({ color: 0x00ff00 });
 
   // add geometry
-  const planeGeo = new THREE.PlaneGeometry(20, 20);
-  const baseplate = new THREE.Mesh(planeGeo, materialLambert);
-  baseplate.rotation.x = -0.5 * Math.PI;
-  scene.add(baseplate);
+
 
   // operations
   // Any value added to this map will have the update(dt) function called from within that object.
