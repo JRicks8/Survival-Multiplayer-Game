@@ -21,40 +21,41 @@ hexIndex.set("8f563b", 3);
 hexIndex.set("6abe30", 4);
 
 // create geo for tiles
-const standardTileGeo = new THREE.BufferGeometry();
+const halfBlockSize = 0.5;
+const standardBlockGeo = new THREE.BufferGeometry();
 // standardTileGeo vertex buffer & index buffer
 {
   const vertexBuffer = new THREE.InterleavedBuffer(new Float32Array([
     // Front
-    -0.5, 0.5, 0.5, 0, 0, -1, 0, 1,
-    0.5, 0.5, 0.5, 0, 0, -1, 1, 1,
-    -0.5, -0.5, 0.5, 0, 0, -1, 0, 0,
-    0.5, -0.5, 0.5, 0, 0, -1, 1, 0,
+    -halfBlockSize, halfBlockSize, halfBlockSize, 0, 0, -1, 0, 1,
+    halfBlockSize, halfBlockSize, halfBlockSize, 0, 0, -1, 1, 1,
+    -halfBlockSize, -halfBlockSize, halfBlockSize, 0, 0, -1, 0, 0,
+    halfBlockSize, -halfBlockSize, halfBlockSize, 0, 0, -1, 1, 0,
     // Back
-    0.5, 0.5, -0.5, 0, 0, 1, 0, 1,
-    -0.5, 0.5, -0.5, 0, 0, 1, 1, 1,
-    0.5, -0.5, -0.5, 0, 0, 1, 0, 0,
-    -0.5, -0.5, -0.5, 0, 0, 1, 1, 0,
+    halfBlockSize, halfBlockSize, -halfBlockSize, 0, 0, 1, 0, 1,
+    -halfBlockSize, halfBlockSize, -halfBlockSize, 0, 0, 1, 1, 1,
+    halfBlockSize, -halfBlockSize, -halfBlockSize, 0, 0, 1, 0, 0,
+    -halfBlockSize, -halfBlockSize, -halfBlockSize, 0, 0, 1, 1, 0,
     // Left
-    -0.5, 0.5, -0.5, -1, 0, 0, 0, 1,
-    -0.5, 0.5, 0.5, -1, 0, 0, 1, 1,
-    -0.5, -0.5, -0.5, -1, 0, 0, 0, 0,
-    -0.5, -0.5, 0.5, -1, 0, 0, 1, 0,
+    -halfBlockSize, halfBlockSize, -halfBlockSize, -1, 0, 0, 0, 1,
+    -halfBlockSize, halfBlockSize, halfBlockSize, -1, 0, 0, 1, 1,
+    -halfBlockSize, -halfBlockSize, -halfBlockSize, -1, 0, 0, 0, 0,
+    -halfBlockSize, -halfBlockSize, halfBlockSize, -1, 0, 0, 1, 0,
     // Right
-    0.5, 0.5, 0.5, 1, 0, 0, 0, 1,
-    0.5, 0.5, -0.5, 1, 0, 0, 1, 1,
-    0.5, -0.5, 0.5, 1, 0, 0, 0, 0,
-    0.5, -0.5, -0.5, 1, 0, 0, 1, 0,
+    halfBlockSize, halfBlockSize, halfBlockSize, 1, 0, 0, 0, 1,
+    halfBlockSize, halfBlockSize, -halfBlockSize, 1, 0, 0, 1, 1,
+    halfBlockSize, -halfBlockSize, halfBlockSize, 1, 0, 0, 0, 0,
+    halfBlockSize, -halfBlockSize, -halfBlockSize, 1, 0, 0, 1, 0,
     // Top
-    -0.5, 0.5, 0.5, 0, 1, 0, 0, 1,
-    0.5, 0.5, 0.5, 0, 1, 0, 1, 1,
-    -0.5, 0.5, -0.5, 0, 1, 0, 0, 0,
-    0.5, 0.5, -0.5, 0, 1, 0, 1, 0,
+    -halfBlockSize, halfBlockSize, halfBlockSize, 0, 1, 0, 0, 1,
+    halfBlockSize, halfBlockSize, halfBlockSize, 0, 1, 0, 1, 1,
+    -halfBlockSize, halfBlockSize, -halfBlockSize, 0, 1, 0, 0, 0,
+    halfBlockSize, halfBlockSize, -halfBlockSize, 0, 1, 0, 1, 0,
     // Bottom
-    0.5, -0.5, 0.5, 0, -1, 0, 1, 0,
-    -0.5, -0.5, 0.5, 0, -1, 0, 0, 0,
-    0.5, -0.5, -0.5, 0, -1, 0, 1, 1,
-    -0.5, -0.5, -0.5, 0, -1, 0, 0, 1,
+    halfBlockSize, -halfBlockSize, halfBlockSize, 0, -1, 0, 1, 0,
+    -halfBlockSize, -halfBlockSize, halfBlockSize, 0, -1, 0, 0, 0,
+    halfBlockSize, -halfBlockSize, -halfBlockSize, 0, -1, 0, 1, 1,
+    -halfBlockSize, -halfBlockSize, -halfBlockSize, 0, -1, 0, 0, 1,
   ]), 8);
 
   const indices = new Uint16Array([
@@ -72,42 +73,42 @@ const standardTileGeo = new THREE.BufferGeometry();
     22, 21, 23
   ]);
 
-  standardTileGeo.setIndex(new THREE.BufferAttribute(indices, 1));
-  standardTileGeo.setAttribute("position", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 0));
-  standardTileGeo.setAttribute("normal", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 3));
-  standardTileGeo.setAttribute("uv", new THREE.InterleavedBufferAttribute(vertexBuffer, 6, 2));
+  standardBlockGeo.setIndex(new THREE.BufferAttribute(indices, 1));
+  standardBlockGeo.setAttribute("position", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 0));
+  standardBlockGeo.setAttribute("normal", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 3));
+  standardBlockGeo.setAttribute("uv", new THREE.InterleavedBufferAttribute(vertexBuffer, 6, 2));
 }
 
-// the tileref has an array of all of the possible tiles
+// the blockref has an array of all of the possible blocks
 const blockRef = [
   {//0
     name: "air",
     material: new THREE.MeshLambertMaterial({ transparent: true, opacity: 0 }),
-    geometry: standardTileGeo,
+    geometry: standardBlockGeo,
     opaque: false,
   },
   {//1
     name: "banded iron",
     material: new THREE.MeshLambertMaterial({ color: 0x000000 }),
-    geometry: standardTileGeo,
+    geometry: standardBlockGeo,
     opaque: true
   },
   {//2
     name: "stone",
     material: new THREE.MeshLambertMaterial({ color: 0x847E87 }),
-    geometry: standardTileGeo,
+    geometry: standardBlockGeo,
     opaque: true
   },
   {//3
     name: "dirt",
     material: new THREE.MeshLambertMaterial({ color: 0x8F563B }),
-    geometry: standardTileGeo,
+    geometry: standardBlockGeo,
     opaque: true
   },
   {//4
     name: "grass",
     material: new THREE.MeshLambertMaterial({ color: 0x6ABE30 }),
-    geometry: standardTileGeo,
+    geometry: standardBlockGeo,
     opaque: true
   },
 ];
@@ -135,54 +136,100 @@ class Block {
   }
 }
 
-/** Wave Function Collapse Algorithm, used for world generation */
-class WFC {
-  /** init params for world generation */
-  constructor() {
-
+class LayeredNoise {
+  constructor(scale, octaves, persistance, lacunarity) {
+    this.scale = scale;
+    this.octaves = octaves;
+    this.persistance = persistance;
+    this.lacunarity = lacunarity;
   }
 
-  /** generates the world using the WFC */
-  generate(file, n = 3) {
-    // 1: read input, store every NxNxN pattern and count occurences
-    this.parseWorldText(file).then(data => {
-      for (let x = 0; x < data.length; x++) {
-        for (let y = 0; y < data[x].length; y++) {
-          for (let z = 0; z < data[x][y].length; z++) {
-            data[x][y][z].addToScene(scene);
-          }
+  getNoise(x, y, z = 0) {
+    let amplitude = 1;
+    let frequency = 1;
+    let outNoise = 0;
+
+    for (let i = 0; i < this.octaves; i++) {
+      let sampleX = x / this.scale * frequency;
+      let sampleY = y / this.scale * frequency;
+      let sampleZ = z / this.scale * frequency;
+
+      let n = noise.simplex3(sampleX, sampleY, sampleZ);
+      outNoise += n * amplitude;
+
+      amplitude *= this.persistance;
+      frequency *= this.lacunarity;
+    }
+
+    return outNoise;
+  }
+}
+
+class World {
+  constructor(w, h, d) {
+    // initialize block data 3d array
+    this.width = w;
+    this.height = h;
+    this.depth = d;
+    this.bData = new Array(w);
+    for (let i = 0; i < this.bData.length; i++) {
+      this.bData[i] = new Array(h);
+      for (let j = 0; j < this.bData[i].length; j++) {
+        this.bData[i][j] = new Array(d);
+      }
+    }
+    this.seed = noise.seed;
+  }
+
+  generate() {
+    noise.seed(Math.random());
+    let layeredNoise = new LayeredNoise(20, 4, 0.5, 1.5);
+    let surfaceHeightVariance = 4;
+    let surfaceLevel = Math.round(this.height * 0.7);
+
+    // generate hills and valleys
+    this.forEachBlock((block, x, y, z) => { // x, y, z is the position of the block in array
+      let n = layeredNoise.getNoise(x, z);
+      n = Math.round(n * surfaceHeightVariance) + surfaceLevel;
+
+      if (y === n) this.bData[x][y][z] = new Block(4, new THREE.Vector3(x, y, z));
+      else if (y < n) this.bData[x][y][z] = new Block(3, new THREE.Vector3(x, y, z));
+      else {
+        this.bData[x][y][z] = new Block(0, new THREE.Vector3(x, y, z));
+        return;
+      }
+      this.bData[x][y][z].addToScene(scene);
+    });
+
+    // last step: if surrounded by opaque neighbors, do not render the block.
+    this.forEachBlock((block, x, y, z) => {
+      // if any neighbors are oob or transparent, we need to keep rendering the block
+      // don't check for the bottom neighbor because of camera constraints
+      if (x + 1 === this.width ||
+          x - 1 < 0 ||
+          y + 1 === this.height ||
+          z + 1 === this.depth ||
+          z - 1 < 0) return;
+      if (!blockRef[this.bData[x + 1][y][z].bId].opaque ||
+          !blockRef[this.bData[x - 1][y][z].bId].opaque ||
+          !blockRef[this.bData[x][y + 1][z].bId].opaque ||
+          !blockRef[this.bData[x][y][z + 1].bId].opaque ||
+          !blockRef[this.bData[x][y][z - 1].bId].opaque) {
+        return;
+      } // no neighbors are transparent, so we don't need to render the block.
+      block.removeFromScene(scene);
+    });
+  }
+
+  // RETURNS A COPY OF THE BLOCK, NOT REFERENCE. WHY? I DONT KNOW!
+  forEachBlock(func) {
+    for (let i = 0; i < this.bData.length; i++) {
+      for (let j = 0; j < this.bData[i].length; j++) {
+        for (let k = 0; k < this.bData[i][j].length; k++) {
+          func(this.bData[i][j][k], i, j, k);
         }
       }
-    });
-    console.log("done adding blocks to scene");
-
-    // 2: store every possible adjacency pattern
-
-    // 3: create 3d array (called w for wave). Each element holds an array
-    // of bools determining the state of each stored pattern. At start, all
-    // bools are true because every pattern is initially possible.
-
-    // 4: create 3d array (called h). each element holds a float that is the
-    // "entropy" value of the corresponding cell in output.
-    // calculate entropy via the shannon formula, the input being the number
-    // of true values in the wave cell (w[n]).
-    // Initial entropy of all wave cells are the same.
-
-    // 5: find cell with minimum non-zero entropy (first iteration is random)
-    // out of valid patterns (true values) pick one randomly, weighted by that
-    // pattern's occurences.
-
-    // 6: assign the selected pattern to the cell with minimum entropy (every
-    // pattern bool in the wave cell is false except for the chosen one)
-
-    // 7: assigning a pattern to a tile has effects on neighboring tiles. using
-    // the adjacency patterns in step 2, adjust possible patterns in neighboring
-    // tiles. this is of course recursive and should be propagated to all tiles.
-    // IF THERE ARE NO POSSIBLE PATTERNS IN ANY NEIGHBORS, the program must be stopped.
-
-    // 8: recalculate entropy.
-
-    // repeat steps 5-8 until all cells have collapsed.
+    }
   }
 
   // .txt world format: "X Z Y 000000"
@@ -221,7 +268,7 @@ class WFC {
     for (let i = 0; i < output.length; i++) {
       for (let j = 0; j < output[i].length; j++) {
         for (let k = 0; k < output[i][j].length; k++) {
-          if (output[ i ][ j ][ k ] == null) output[ i ][ j ][ k ] = new Block(0, new THREE.Vector3(i, j, k));
+          if (output[i][j][k] == null) output[i][j][k] = new Block(0, new THREE.Vector3(i, j, k));
         }
       }
     }
@@ -232,7 +279,7 @@ class WFC {
 
 class Character {
   constructor() {
-    const boxGeo = new THREE.BoxGeometry(1, 2, 1);
+    const boxGeo = new THREE.BoxGeometry(0.5, 1.5, 0.5);
     const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
     this.mesh = new THREE.Mesh(boxGeo, playerMaterial);
     this.mesh.position.setY(1);
@@ -253,7 +300,7 @@ class Character {
   }
 
   update(dt) {
-    this.mesh.position.clamp(new THREE.Vector3(-10, 1, -10), new THREE.Vector3(10, 10, 10));
+    //this.mesh.position.clamp(new THREE.Vector3(-10, 1, -10), new THREE.Vector3(10, 10, 10));
   }
 
   setupListeners(uid) {
@@ -393,12 +440,12 @@ function runGame() {
   const contentWrapper = document.querySelector(".content");
 
   // generate world
-  const wfc = new WFC();
-  wfc.generate("../sample-world-0.txt");
+  const world = new World(20, 50, 20);
+  world.generate();
 
   //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
-  let cameraOffset = new THREE.Vector3(15, 10, 15);
+  let cameraOffset = new THREE.Vector3(10, 5, 10);
   let cameraOrigin = new THREE.Vector3();
   let camOffsetRotation = 0;
 
@@ -480,6 +527,26 @@ function runGame() {
     },
     pressCallback: () => { },
     upCallback: () => { },
+  });
+
+  keyManager.addKey("KeyR", {
+    down: false,
+    downFunction: dt => {
+      let up = new THREE.Vector3(0, 1, 0);
+      movePlayer(up.multiplyScalar(clientCharacter.speed * dt));
+    },
+    pressCallback: () => {},
+    upCallback: () => {},
+  });
+
+  keyManager.addKey("KeyF", {
+    down: false,
+    downFunction: dt => {
+      let up = new THREE.Vector3(0, 1, 0);
+      movePlayer(up.multiplyScalar(-clientCharacter.speed * dt));
+    },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyQ", {
