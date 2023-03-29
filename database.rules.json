@@ -11,6 +11,15 @@
       "$uid": {
         ".write": "auth != null && auth.uid == $uid"
       }
+    },
+    "world": {
+      ".write": "auth != null",
+      "seed": {
+        ".write": false
+      },
+      "size": {
+        ".write": false
+      }
     }
   }
 }

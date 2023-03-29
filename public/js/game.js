@@ -119,12 +119,16 @@ class Block {
     const b = blockRef[bId];
     this.mesh = new THREE.Mesh(b.geometry, b.material)
     this.mesh.position.setX(pos.x);
-    this.mesh.position.setY(pos.y - 20);
+    this.mesh.position.setY(pos.y);
     this.mesh.position.setZ(pos.z);
   }
 
   setPosition(pos) {
     this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2));
+  }
+
+  getPosition() {
+    return this.mesh.position.toArray();
   }
 
   addToScene(s) {
@@ -178,11 +182,11 @@ class World {
         this.bData[i][j] = new Array(d);
       }
     }
-    this.seed = noise.seed;
+    this.seed = Math.round(Math.random() * 65536);
+    noise.seed(this.seed);
   }
 
   generate() {
-    noise.seed(Math.random());
     let layeredNoise = new LayeredNoise(20, 4, 0.5, 1.5);
     let surfaceHeightVariance = 4;
     let surfaceLevel = Math.round(this.height * 0.7);
@@ -232,48 +236,62 @@ class World {
     }
   }
 
-  // .txt world format: "X Z Y 000000"
-  async parseWorldText(file) {
-    // parse world sample text into usable game data
-    // js is annoying, wish I could just do output[6][40][6];
-    let output = new Array(6);
-    for (let i = 0; i < output.length; i++) {
-      output[i] = new Array(40);
-      for (let j = 0; j < output[i].length; j++) {
-        output[i][j] = new Array(6);
+  // sends data of ENTIRE WORLD
+  async sendWorldData() {
+    // DATA STRUCTURE
+    // World
+      // seed (int)
+      // Size [w, h, d] (arr)
+      // chunk_X_Y_Z
+        // block data [X, Y, Z, ID#, X, Y, Z, ID#] (multiple blocks stored into one array for efficient storage)
+    // END
+    
+    database.ref(`world`).set(null); // erase all
+    database.ref(`world/seed`).set(this.seed);
+    let size = new Uint8Array(3);
+    size[0] = this.width;
+    size[1] = this.height;
+    size[2] = this.depth;
+    database.ref(`world/size`).set(size);
+
+    // create chunk data 3d array
+    const chunkSize = 16;
+    let chunkArr = new Array(Math.ceil(this.width / chunkSize));
+    for (let x = 0; x < chunkArr.length; x++) {
+      chunkArr[x] = new Array(Math.ceil(this.height / chunkSize));
+      for (let y = 0; y < chunkArr[x].length; y++) {
+        chunkArr[x][y] = new Array(Math.ceil(this.depth / chunkSize));
       }
     }
 
-    await fetch(file)
-    .then(response => response.text())
-    .then(text => {
-      const lines = text.split('\n');
-
-      // set existing tiles
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line[0] === '#') continue;
-        let vals = line.split(' ');
-        let outPos = new THREE.Vector3(parseInt(vals[0]), parseInt(vals[2]), parseInt(vals[1])); // z-up -> y-up
-        vals[3] = vals[3].trim(); // remove invisible '\n' at end of string. This caused me hours of pain.
-        let bId = hexIndex.get(vals[3]);
-        if (bId == null) {
-          console.log(`ERR: tile id not found from hex code ${vals[3]}. Tile will be air.`);
-          bId = 0;
-        }
-        output[outPos.x][outPos.y][outPos.z] = new Block(bId, outPos);
-      }
-    });
-
-    for (let i = 0; i < output.length; i++) {
-      for (let j = 0; j < output[i].length; j++) {
-        for (let k = 0; k < output[i][j].length; k++) {
-          if (output[i][j][k] == null) output[i][j][k] = new Block(0, new THREE.Vector3(i, j, k));
+    // add block data to each chunk
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        for (let z = 0; z < this.depth; z++) {
+          const block = this.bData[x][y][z];
+          const chunkPos = [Math.floor(x / chunkSize), Math.floor(y / chunkSize), Math.floor(z / chunkSize)];
+          const blockPos = block.getPosition();
+          const dataStride = 4;
+          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(chunkSize * chunkSize * chunkSize * dataStride);
+          // chunkdata is a typed 1d array, so we need to map a 3d coordinates to fit in a 1d array. cannot use .push()
+          let localpos = [x % chunkSize, y % chunkSize, z % chunkSize]; // get position of block local to chunk origin
+          let i = (localpos[0] + localpos[1] * chunkSize + localpos[2] * chunkSize * chunkSize) * dataStride; // map local position to index in chunk data
+          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i] = blockPos[0];
+          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 1] = blockPos[1];
+          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 2] = blockPos[2];
+          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 3] = block.bId;
         }
       }
     }
 
-    return output;
+    // send updates to server
+    for (let x = 0; x < chunkArr.length; x++) {
+      for (let y = 0; y < chunkArr[x].length; y++) {
+        for (let z = 0; z < chunkArr[x][y].length; z++) {
+          database.ref(`world/chunk_${x}_${y}_${z}`).set(chunkArr[x][y][z]);
+        }
+      }
+    }
   }
 }
 
@@ -373,10 +391,12 @@ auth.onAuthStateChanged(user => {
     }
     wrapper();
   } else if (clientUid != null) { // player logged out, remove info from database
-    console.log("player logged out, reset game state");
+    console.log("player logged out, reset local game state");
     authenticated = false;
-    console.log(clientUid);
     resetGameGlobals();
+    if (database.ref(`players`) == null) { // if there are no players left
+      database.ref(`world`).set(null);
+    }
   }
 });
 
@@ -440,8 +460,9 @@ function runGame() {
   const contentWrapper = document.querySelector(".content");
 
   // generate world
-  const world = new World(20, 50, 20);
+  const world = new World(32, 64, 32);
   world.generate();
+  world.sendWorldData();
 
   //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
