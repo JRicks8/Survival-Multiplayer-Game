@@ -11,52 +11,87 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// make this object because in the voxel editor, we are given only position and hex color,
-// so use the hex color in the editor to convert to tile indices.
-// I do this for faster lookup when parsing sample world data
-const hexIndex = new Map();
-hexIndex.set("000000", 1);
-hexIndex.set("847e87", 2);
-hexIndex.set("8f563b", 3);
-hexIndex.set("6abe30", 4);
-
 // create geo for tiles
-const halfBlockSize = 0.5;
+const half = 0.5;
 const standardBlockGeo = new THREE.BufferGeometry();
+const VERTEX_SIZE = 8;
+
+function getWorldCubeFace(face, pos) {
+  switch (face) {
+    case 0: return [ // front
+      -half + pos[0], half + pos[1], half + pos[2], 0, 0, -1, 0, 1,
+      half + pos[0], half + pos[1], half + pos[2], 0, 0, -1, 1, 1,
+      -half + pos[0], -half + pos[1], half + pos[2], 0, 0, -1, 0, 0,
+      half + pos[0], -half + pos[1], half + pos[2], 0, 0, -1, 1, 0
+    ];
+    case 1: return [ // back
+      half + pos[0], half + pos[1], -half + pos[2], 0, 0, 1, 0, 1,
+      -half + pos[0], half + pos[1], -half + pos[2], 0, 0, 1, 1, 1,
+      half + pos[0], -half + pos[1], -half + pos[2], 0, 0, 1, 0, 0,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, 1, 1, 0
+    ];
+    case 2: return [ // left
+      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, 0, 1,
+      -half + pos[0], half + pos[1], half + pos[2], -1, 0, 0, 1, 1,
+      -half + pos[0], -half + pos[1], -half + pos[2], -1, 0, 0, 0, 0,
+      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, 1, 0
+    ];
+    case 3: return [ // right
+      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, 0, 1,
+      half + pos[0], half + pos[1], -half + pos[2], 1, 0, 0, 1, 1,
+      half + pos[0], -half + pos[1], half + pos[2], 1, 0, 0, 0, 0,
+      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, 1, 0
+    ];
+    case 4: return [ // top
+      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, 0, 1,
+      half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, 1, 1,
+      -half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, 0, 0,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, 1, 0
+    ];
+    case 5: return [ // bottom
+      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, 1, 0,
+      -half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, 0, 0,
+      half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, 1, 1,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, 0, 1
+    ];
+    default: console.log("err: face needs to be an integer 0-5");
+  }
+}
+const cubeVertexBuffer = new Float32Array([
+  // Front
+  -half, half, half, 0, 0, -1, 0, 1,
+  half, half, half, 0, 0, -1, 1, 1,
+  -half, -half, half, 0, 0, -1, 0, 0,
+  half, -half, half, 0, 0, -1, 1, 0,
+  // Back
+  half, half, -half, 0, 0, 1, 0, 1,
+  -half, half, -half, 0, 0, 1, 1, 1,
+  half, -half, -half, 0, 0, 1, 0, 0,
+  -half, -half, -half, 0, 0, 1, 1, 0,
+  // Left
+  -half, half, -half, -1, 0, 0, 0, 1,
+  -half, half, half, -1, 0, 0, 1, 1,
+  -half, -half, -half, -1, 0, 0, 0, 0,
+  -half, -half, half, -1, 0, 0, 1, 0,
+  // Right
+  half, half, half, 1, 0, 0, 0, 1,
+  half, half, -half, 1, 0, 0, 1, 1,
+  half, -half, half, 1, 0, 0, 0, 0,
+  half, -half, -half, 1, 0, 0, 1, 0,
+  // Top
+  -half, half, half, 0, 1, 0, 0, 1,
+  half, half, half, 0, 1, 0, 1, 1,
+  -half, half, -half, 0, 1, 0, 0, 0,
+  half, half, -half, 0, 1, 0, 1, 0,
+  // Bottom
+  half, -half, half, 0, -1, 0, 1, 0,
+  -half, -half, half, 0, -1, 0, 0, 0,
+  half, -half, -half, 0, -1, 0, 1, 1,
+  -half, -half, -half, 0, -1, 0, 0, 1,
+]);
 // standardTileGeo vertex buffer & index buffer
 {
-  const vertexBuffer = new THREE.InterleavedBuffer(new Float32Array([
-    // Front
-    -halfBlockSize, halfBlockSize, halfBlockSize, 0, 0, -1, 0, 1,
-    halfBlockSize, halfBlockSize, halfBlockSize, 0, 0, -1, 1, 1,
-    -halfBlockSize, -halfBlockSize, halfBlockSize, 0, 0, -1, 0, 0,
-    halfBlockSize, -halfBlockSize, halfBlockSize, 0, 0, -1, 1, 0,
-    // Back
-    halfBlockSize, halfBlockSize, -halfBlockSize, 0, 0, 1, 0, 1,
-    -halfBlockSize, halfBlockSize, -halfBlockSize, 0, 0, 1, 1, 1,
-    halfBlockSize, -halfBlockSize, -halfBlockSize, 0, 0, 1, 0, 0,
-    -halfBlockSize, -halfBlockSize, -halfBlockSize, 0, 0, 1, 1, 0,
-    // Left
-    -halfBlockSize, halfBlockSize, -halfBlockSize, -1, 0, 0, 0, 1,
-    -halfBlockSize, halfBlockSize, halfBlockSize, -1, 0, 0, 1, 1,
-    -halfBlockSize, -halfBlockSize, -halfBlockSize, -1, 0, 0, 0, 0,
-    -halfBlockSize, -halfBlockSize, halfBlockSize, -1, 0, 0, 1, 0,
-    // Right
-    halfBlockSize, halfBlockSize, halfBlockSize, 1, 0, 0, 0, 1,
-    halfBlockSize, halfBlockSize, -halfBlockSize, 1, 0, 0, 1, 1,
-    halfBlockSize, -halfBlockSize, halfBlockSize, 1, 0, 0, 0, 0,
-    halfBlockSize, -halfBlockSize, -halfBlockSize, 1, 0, 0, 1, 0,
-    // Top
-    -halfBlockSize, halfBlockSize, halfBlockSize, 0, 1, 0, 0, 1,
-    halfBlockSize, halfBlockSize, halfBlockSize, 0, 1, 0, 1, 1,
-    -halfBlockSize, halfBlockSize, -halfBlockSize, 0, 1, 0, 0, 0,
-    halfBlockSize, halfBlockSize, -halfBlockSize, 0, 1, 0, 1, 0,
-    // Bottom
-    halfBlockSize, -halfBlockSize, halfBlockSize, 0, -1, 0, 1, 0,
-    -halfBlockSize, -halfBlockSize, halfBlockSize, 0, -1, 0, 0, 0,
-    halfBlockSize, -halfBlockSize, -halfBlockSize, 0, -1, 0, 1, 1,
-    -halfBlockSize, -halfBlockSize, -halfBlockSize, 0, -1, 0, 0, 1,
-  ]), 8);
+  const vertexBuffer = new THREE.InterleavedBuffer(cubeVertexBuffer, VERTEX_SIZE);
 
   const indices = new Uint16Array([
     0, 2, 1,
@@ -76,7 +111,7 @@ const standardBlockGeo = new THREE.BufferGeometry();
   standardBlockGeo.setIndex(new THREE.BufferAttribute(indices, 1));
   standardBlockGeo.setAttribute("position", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 0));
   standardBlockGeo.setAttribute("normal", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 3));
-  standardBlockGeo.setAttribute("uv", new THREE.InterleavedBufferAttribute(vertexBuffer, 6, 2));
+  standardBlockGeo.setAttribute("uv", new THREE.InterleavedBufferAttribute(vertexBuffer, 2, 6));
 }
 
 // the blockref has an array of all of the possible blocks
@@ -116,27 +151,7 @@ const blockRef = [
 class Block {
   constructor(bId = 0, pos = new THREE.Vector3(0,0,0)) {
     this.bId = bId;
-    const b = blockRef[bId];
-    this.mesh = new THREE.Mesh(b.geometry, b.material)
-    this.mesh.position.setX(pos.x);
-    this.mesh.position.setY(pos.y);
-    this.mesh.position.setZ(pos.z);
-  }
-
-  setPosition(pos) {
-    this.mesh.position.set(pos.getComponent(0), pos.getComponent(1), pos.getComponent(2));
-  }
-
-  getPosition() {
-    return this.mesh.position.toArray();
-  }
-
-  addToScene(s) {
-    s.add(this.mesh);
-  }
-
-  removeFromScene(s) {
-    s.remove(this.mesh);
+    this.position = pos;
   }
 }
 
@@ -175,6 +190,9 @@ class World {
     this.width = w;
     this.height = h;
     this.depth = d;
+    this.chunkMeshes = new Array(Math.ceil(w / 16) * Math.ceil(h / 16) * Math.ceil(d / 16));
+
+    // 3d array
     this.bData = new Array(w);
     for (let i = 0; i < this.bData.length; i++) {
       this.bData[i] = new Array(h);
@@ -202,41 +220,32 @@ class World {
         this.bData[x][y][z] = new Block(0, new THREE.Vector3(x, y, z));
         return;
       }
-      this.bData[x][y][z].addToScene(scene);
-    });
-
-    // last step: if surrounded by opaque neighbors, do not render the block.
-    this.forEachBlock((block, x, y, z) => {
-      // if any neighbors are oob or transparent, we need to keep rendering the block
-      // don't check for the bottom neighbor because of camera constraints
-      if (x + 1 === this.width ||
-          x - 1 < 0 ||
-          y + 1 === this.height ||
-          z + 1 === this.depth ||
-          z - 1 < 0) return;
-      if (!blockRef[this.bData[x + 1][y][z].bId].opaque ||
-          !blockRef[this.bData[x - 1][y][z].bId].opaque ||
-          !blockRef[this.bData[x][y + 1][z].bId].opaque ||
-          !blockRef[this.bData[x][y][z + 1].bId].opaque ||
-          !blockRef[this.bData[x][y][z - 1].bId].opaque) {
-        return;
-      } // no neighbors are transparent, so we don't need to render the block.
-      block.removeFromScene(scene);
     });
   }
 
   // RETURNS A COPY OF THE BLOCK, NOT REFERENCE. WHY? I DONT KNOW!
   forEachBlock(func) {
-    for (let i = 0; i < this.bData.length; i++) {
-      for (let j = 0; j < this.bData[i].length; j++) {
-        for (let k = 0; k < this.bData[i][j].length; k++) {
-          func(this.bData[i][j][k], i, j, k);
+    for (let x = 0; x < this.bData.length; x++) {
+      for (let y = 0; y < this.bData[x].length; y++) {
+        for (let z = 0; z < this.bData[x][y].length; z++) {
+          func(this.bData[x][y][z], x, y, z);
+        }
+      }
+    }
+  }
+
+  forEachChunk(func) {
+    for (let x = 0; x < Math.ceil(this.width / 16); x++) {
+      for (let y = 0; y < Math.ceil(this.height / 16); y++) {
+        for (let z = 0; z < Math.ceil(this.depth / 16); z++) {
+          func(x, y, z);
         }
       }
     }
   }
 
   // sends data of ENTIRE WORLD
+  // ONLY USE when generating a new world.
   async sendWorldData() {
     // DATA STRUCTURE
     // World
@@ -255,12 +264,11 @@ class World {
     database.ref(`world/size`).set(size);
 
     // create chunk data 3d array
-    const chunkSize = 16;
-    let chunkArr = new Array(Math.ceil(this.width / chunkSize));
+    let chunkArr = new Array(Math.ceil(this.width / 16));
     for (let x = 0; x < chunkArr.length; x++) {
-      chunkArr[x] = new Array(Math.ceil(this.height / chunkSize));
+      chunkArr[x] = new Array(Math.ceil(this.height / 16));
       for (let y = 0; y < chunkArr[x].length; y++) {
-        chunkArr[x][y] = new Array(Math.ceil(this.depth / chunkSize));
+        chunkArr[x][y] = new Array(Math.ceil(this.depth / 16));
       }
     }
 
@@ -269,13 +277,13 @@ class World {
       for (let y = 0; y < this.height; y++) {
         for (let z = 0; z < this.depth; z++) {
           const block = this.bData[x][y][z];
-          const chunkPos = [Math.floor(x / chunkSize), Math.floor(y / chunkSize), Math.floor(z / chunkSize)];
-          const blockPos = block.getPosition();
+          const chunkPos = [Math.floor(x / 16), Math.floor(y / 16), Math.floor(z / 16)];
+          const blockPos = block.position.toArray();
           const dataStride = 4;
-          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(chunkSize * chunkSize * chunkSize * dataStride);
-          // chunkdata is a typed 1d array, so we need to map a 3d coordinates to fit in a 1d array. cannot use .push()
-          let localpos = [x % chunkSize, y % chunkSize, z % chunkSize]; // get position of block local to chunk origin
-          let i = (localpos[0] + localpos[1] * chunkSize + localpos[2] * chunkSize * chunkSize) * dataStride; // map local position to index in chunk data
+          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(16 * 16 * 16 * dataStride);
+          // chunkdata is a typed 1d array, so we need to map 3d coordinates to fit in a 1d array. cannot use .push()
+          let localpos = [x % 16, y % 16, z % 16]; // get position of block local to chunk origin
+          let i = (localpos[0] + localpos[1] * 16 + localpos[2] * 16 * 16) * dataStride; // map local position to index in chunk data
           chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i] = blockPos[0];
           chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 1] = blockPos[1];
           chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 2] = blockPos[2];
@@ -292,6 +300,138 @@ class World {
         }
       }
     }
+  }
+
+  // gets world data from server
+  async retrieveWorldData() {
+    // for each chunk
+    const dataStride = 4;
+    await database.ref(`world`).get().then((snapshot) => {
+      if (snapshot.exists()) {
+        this.seed = snapshot.child("seed").val();
+        let size = snapshot.child("size").val();
+        this.width = size[0];
+        this.height = size[1];
+        this.depth = size[2];
+
+        for (let x = 0; x < Math.ceil(this.width / 16); x++) {
+          for (let y = 0; y < Math.ceil(this.height / 16); y++) {
+            for (let z = 0; z < Math.ceil(this.depth / 16); z++) {
+              const chunkData = snapshot.child(`chunk_${x}_${y}_${z}`).val();
+              for (let i = 0; i < chunkData.length; i += dataStride) {
+                let pos = [chunkData[i], chunkData[i + 1], chunkData[i + 2]];
+                this.bData[pos[0]][pos[1]][pos[2]] = new Block(chunkData[i + 3], new THREE.Vector3(pos[0], pos[1], pos[2]));
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  addWorldToScene(s) {
+    for (let i = 0; i < this.chunkMeshes.length; i++) {
+      s.add(this.chunkMeshes[i]);
+    }
+  }
+
+  createChunkMeshes() {
+    // I need a vertex array of all verts that I need to render in a chunk
+    const chunkMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
+    const chunkArrSize = Math.ceil(this.width / 16) * Math.ceil(this.height / 16) * Math.ceil(this.depth / 16);
+    const chunkVertexBuffers = new Array(chunkArrSize);
+    const chunkIndexBuffers = new Array(chunkArrSize);
+    const chunkGeos = new Array(chunkArrSize);
+    for (let i = 0; i < chunkArrSize; i++) {
+      chunkVertexBuffers[i] = [];
+      chunkIndexBuffers[i] = [];
+      chunkGeos[i] = new THREE.BufferGeometry();
+    }
+
+    // add block vertices to vertex buffer if necessary
+    this.forEachBlock((block, x, y, z) => {
+      // if any neighbors are oob or transparent, we need to keep rendering the face
+      // don't check for the bottom neighbor because of camera constraints
+
+      if (block.bId === 0) return; // don't render air blocks
+      const chunkPos = [Math.floor(x / 16), Math.floor(y / 16), Math.floor(z / 16)];
+      // convert chunk position to chunk 2d array index
+      let i = chunkPos[0] + chunkPos[1] * Math.ceil(this.width / 16) + chunkPos[2] * Math.ceil(this.width / 16) * Math.ceil(this.height / 16);
+      if (x + 1 === this.width) { // right face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z]));
+      } else if (x - 1 < 0) { // left face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z]));
+      } else if (y + 1 === this.height) { // top face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z]));
+      } else if (z + 1 === this.depth) { // back face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z]));
+      } else if (z - 1 < 0) { // front face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z]));
+      } else if (!blockRef[this.bData[x + 1][y][z].bId].opaque) { // right block transparent
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z]));
+      } else if (!blockRef[this.bData[x - 1][y][z].bId].opaque) { // left block transparent
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z]));
+      } else if (!blockRef[this.bData[x][y + 1][z].bId].opaque) { // top block transparent
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z]));
+      } else if (!blockRef[this.bData[x][y][z + 1].bId].opaque) { // back block transparent
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z]));
+      } else if (!blockRef[this.bData[x][y][z - 1].bId].opaque) { // front block transparent
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z]));
+      }
+    });
+
+    // index the vertex buffers and push to chunkIndexBuffers array
+    for (let chunkIndex = 0; chunkIndex < chunkArrSize; chunkIndex++) { // for each chunk
+      let outVb = [];
+      let outIb = [];
+
+      // for each input vertex
+      for (let i = 0; i < chunkVertexBuffers[chunkIndex].length; i += VERTEX_SIZE) {
+        // extract the vertex for comparison
+        let vertex = chunkVertexBuffers[chunkIndex].slice(i, i + VERTEX_SIZE);
+        
+        let index = undefined;
+        // look in outVb for the same vertex
+        for (let j = 0; j < outVb.length; j += VERTEX_SIZE) { // for each vert in output
+          if (vertex[0] == outVb[j] &&
+            vertex[1] == outVb[j + 1] &&
+            vertex[2] == outVb[j + 2] &&
+            vertex[3] == outVb[j + 3] &&
+            vertex[4] == outVb[j + 4] &&
+            vertex[5] == outVb[j + 5] &&
+            vertex[6] == outVb[j + 6] &&
+            vertex[7] == outVb[j + 7]) { // if there is a similar vertex in input buffer
+            index = j;
+            break;
+          }
+        }
+
+        if (index == undefined) { // if the vertex is not in the output already
+          outIb.push(i / VERTEX_SIZE);
+          outVb = outVb.concat(vertex);
+        } else {
+          outIb.push(index);
+        }
+      }
+
+      chunkVertexBuffers[chunkIndex] = outVb;
+      chunkIndexBuffers[chunkIndex] = outIb;
+    }
+
+    for (let i = 0; i < chunkArrSize; i++) {
+      // set geometry vertex and index buffers
+      chunkGeos[i].setIndex(new THREE.BufferAttribute(Uint16Array.from(chunkIndexBuffers[i]), 1));
+      const vBuff = new THREE.InterleavedBuffer(Float32Array.from(chunkVertexBuffers[i]), VERTEX_SIZE);
+      chunkGeos[i].setAttribute("position", new THREE.InterleavedBufferAttribute(vBuff, 3, 0));
+      chunkGeos[i].setAttribute("normal", new THREE.InterleavedBufferAttribute(vBuff, 3, 3));
+      chunkGeos[i].setAttribute("uv", new THREE.InterleavedBufferAttribute(vBuff, 2, 6));
+    }
+
+    this.forEachChunk((x, y, z) => {
+      // convert index to 2d array
+      let i = x + y * Math.ceil(this.width / 16) + z * Math.ceil(this.width / 16) * Math.ceil(this.height / 16);
+      this.chunkMeshes[i] = new THREE.Mesh(chunkGeos[i], chunkMat);
+    });
   }
 }
 
@@ -321,6 +461,7 @@ class Character {
     //this.mesh.position.clamp(new THREE.Vector3(-10, 1, -10), new THREE.Vector3(10, 10, 10));
   }
 
+  // attach listeners to a player's character object
   setupListeners(uid) {
     database.ref(`characters/${uid}/position`).on("value", (snapshot) => {
       if (snapshot == null) return;
@@ -337,6 +478,7 @@ class Character {
 let scene = new THREE.Scene();
 let clientCharacter = new Character();
 let otherCharacters = new Map();
+const world = new World(32, 64, 32);
 let clientUid;
 
 function resetGameGlobals() {
@@ -371,6 +513,17 @@ auth.onAuthStateChanged(user => {
       await database.ref(`players`).get().then((snapshot) => {
         if (!snapshot.exists()) {
           // generate world because no players are in game.
+          console.log("no other players present. Generate World!");
+          world.generate();
+          world.sendWorldData();
+          world.createChunkMeshes();
+          world.addWorldToScene(scene);
+        } else {
+          console.log("other players present. Retrieve World Data!");
+          world.retrieveWorldData().then(() => { 
+            world.createChunkMeshes();
+            world.addWorldToScene(scene) 
+          });
         }
       });
 
@@ -417,9 +570,6 @@ function initGame() {
     if (snapshot.val() == null) currentSnapshot = [];
     else currentSnapshot = Object.keys(snapshot.val());
 
-    console.log("here are the character ids:")
-    for (const key of otherCharacters.keys()) { console.log(key) }
-
     if (currentSnapshot == null) currentSnapshot = [];
     console.log("current snapshot", currentSnapshot);
     console.log("last snapshot", lastSnapshot);
@@ -459,11 +609,6 @@ function runGame() {
   // basic world setup
   const contentWrapper = document.querySelector(".content");
 
-  // generate world
-  const world = new World(32, 64, 32);
-  world.generate();
-  world.sendWorldData();
-
   //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
   let cameraOffset = new THREE.Vector3(10, 5, 10);
@@ -480,13 +625,6 @@ function runGame() {
   const directionalLight = new THREE.DirectionalLight(0xb0b0b0);
   directionalLight.rotation.set(0.2, 0, 0.2);
   scene.add(directionalLight);
-
-  // make materials
-  const materialLambert = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
-  const materialToon = new THREE.MeshToonMaterial({ color: 0x00ff00 });
-
-  // add geometry
-
 
   // operations
   // Any value added to this map will have the update(dt) function called from within that object.
