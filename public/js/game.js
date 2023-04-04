@@ -11,48 +11,70 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// sprite sheet
+const blockSpriteSheet = new THREE.TextureLoader().load("../images/block-textures.png");
+blockSpriteSheet.wrapS = THREE.ClampToEdgeWrapping;
+blockSpriteSheet.wrapT = THREE.ClampToEdgeWrapping;
+blockSpriteSheet.magFilter = THREE.NearestFilter;
+blockSpriteSheet.minFilter = THREE.NearestMipmapNearestFilter;
+
 // create geo for tiles
 const half = 0.5;
 const standardBlockGeo = new THREE.BufferGeometry();
 const VERTEX_SIZE = 8;
 
-function getWorldCubeFace(face, pos) {
+function getWorldCubeFace(face, pos, bId) {
+  let faceOffset = face / 5;
+  let one = (bId + 1) / blockRef.length + faceOffset;
+  let zero = bId / blockRef.length + faceOffset;
   switch (face) {
     case 0: return [ // front
-      -half + pos[0], half + pos[1], half + pos[2], 0, 0, -1, 0, 1,
-      half + pos[0], half + pos[1], half + pos[2], 0, 0, -1, 1, 1,
-      -half + pos[0], -half + pos[1], half + pos[2], 0, 0, -1, 0, 0,
-      half + pos[0], -half + pos[1], half + pos[2], 0, 0, -1, 1, 0
+      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, one, one,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, zero, zero,
+      -half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, zero, one,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, one, one,
+      half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, one, zero,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, zero, zero
     ];
     case 1: return [ // back
-      half + pos[0], half + pos[1], -half + pos[2], 0, 0, 1, 0, 1,
-      -half + pos[0], half + pos[1], -half + pos[2], 0, 0, 1, 1, 1,
-      half + pos[0], -half + pos[1], -half + pos[2], 0, 0, 1, 0, 0,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, 1, 1, 0
+      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, one, one,
+      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, zero, zero,
+      half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, zero, one,
+      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, one, one,
+      -half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, one, zero,
+      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, zero, zero
     ];
     case 2: return [ // left
-      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, 0, 1,
-      -half + pos[0], half + pos[1], half + pos[2], -1, 0, 0, 1, 1,
-      -half + pos[0], -half + pos[1], -half + pos[2], -1, 0, 0, 0, 0,
-      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, 1, 0
+      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, one, one,
+      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, zero, zero, 
+      -half + pos[0], half + pos[1], half + pos[2], -1, 0, 0, zero, one,
+      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, one, one,
+      -half + pos[0], -half + pos[1], -half + pos[2], -1, 0, 0, one, zero, 
+      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, zero, zero
     ];
     case 3: return [ // right
-      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, 0, 1,
-      half + pos[0], half + pos[1], -half + pos[2], 1, 0, 0, 1, 1,
-      half + pos[0], -half + pos[1], half + pos[2], 1, 0, 0, 0, 0,
-      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, 1, 0
+      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, one, one, 
+      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, zero, zero, 
+      half + pos[0], half + pos[1], -half + pos[2], 1, 0, 0, zero, one,
+      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, one, one,
+      half + pos[0], -half + pos[1], half + pos[2], 1, 0, 0, one, zero, 
+      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, zero, zero
     ];
     case 4: return [ // top
-      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, 0, 1,
-      half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, 1, 1,
-      -half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, 0, 0,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, 1, 0
+      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, zero, zero,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, one, one, 
+      -half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, zero, one,
+      half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, one, zero,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, one, one, 
+      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, zero, zero
     ];
     case 5: return [ // bottom
-      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, 1, 0,
-      -half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, 0, 0,
-      half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, 1, 1,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, 0, 1
+      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, one, one,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, zero, zero, 
+      half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, one, zero,
+      -half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, zero, one,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, zero, zero, 
+      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, one, one
     ];
     default: console.log("err: face needs to be an integer 0-5");
   }
@@ -190,6 +212,7 @@ class World {
     this.width = w;
     this.height = h;
     this.depth = d;
+    this.chunkSize = 16;
     this.chunkMeshes = new Array(Math.ceil(w / 16) * Math.ceil(h / 16) * Math.ceil(d / 16));
 
     // 3d array
@@ -337,7 +360,7 @@ class World {
 
   createChunkMeshes() {
     // I need a vertex array of all verts that I need to render in a chunk
-    const chunkMat = new THREE.MeshLambertMaterial({ color: 0x808080 });
+    const chunkMat = new THREE.MeshLambertMaterial({ map: blockSpriteSheet });
     const chunkArrSize = Math.ceil(this.width / 16) * Math.ceil(this.height / 16) * Math.ceil(this.depth / 16);
     const chunkVertexBuffers = new Array(chunkArrSize);
     const chunkIndexBuffers = new Array(chunkArrSize);
@@ -358,25 +381,29 @@ class World {
       // convert chunk position to chunk 2d array index
       let i = chunkPos[0] + chunkPos[1] * Math.ceil(this.width / 16) + chunkPos[2] * Math.ceil(this.width / 16) * Math.ceil(this.height / 16);
       if (x + 1 === this.width) { // right face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z]));
-      } else if (x - 1 < 0) { // left face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z]));
-      } else if (y + 1 === this.height) { // top face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z]));
-      } else if (z + 1 === this.depth) { // back face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z]));
-      } else if (z - 1 < 0) { // front face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z]));
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z], block.bId));
       } else if (!blockRef[this.bData[x + 1][y][z].bId].opaque) { // right block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z]));
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z], block.bId));
+      }
+      if (x - 1 < 0) { // left face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z], block.bId));
       } else if (!blockRef[this.bData[x - 1][y][z].bId].opaque) { // left block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z]));
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z], block.bId));
+      }
+      if (y + 1 === this.height) { // top face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z], block.bId));
       } else if (!blockRef[this.bData[x][y + 1][z].bId].opaque) { // top block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z]));
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z], block.bId));
+      }
+      if (z + 1 === this.depth) { // back face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z], block.bId));
       } else if (!blockRef[this.bData[x][y][z + 1].bId].opaque) { // back block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z]));
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z], block.bId));
+      }
+      if (z - 1 < 0) { // front face exposed to edge
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z], block.bId));
       } else if (!blockRef[this.bData[x][y][z - 1].bId].opaque) { // front block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z]));
+        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z], block.bId));
       }
     });
 
@@ -401,15 +428,16 @@ class World {
             vertex[5] == outVb[j + 5] &&
             vertex[6] == outVb[j + 6] &&
             vertex[7] == outVb[j + 7]) { // if there is a similar vertex in input buffer
-            index = j;
+            index = j / VERTEX_SIZE;
             break;
           }
         }
 
         if (index == undefined) { // if the vertex is not in the output already
-          outIb.push(i / VERTEX_SIZE);
           outVb = outVb.concat(vertex);
-        } else {
+          outIb.push(outVb.length / VERTEX_SIZE - 1);
+
+        } else { // else, push the existing vertex's index to the index buffer
           outIb.push(index);
         }
       }
@@ -432,6 +460,11 @@ class World {
       let i = x + y * Math.ceil(this.width / 16) + z * Math.ceil(this.width / 16) * Math.ceil(this.height / 16);
       this.chunkMeshes[i] = new THREE.Mesh(chunkGeos[i], chunkMat);
     });
+
+    console.log(chunkIndexBuffers[0].slice(0, 6));
+    for (let i = 0; i < 6; i++) {
+      console.log(chunkVertexBuffers[0].slice(chunkIndexBuffers[0][i] * VERTEX_SIZE, chunkIndexBuffers[0][i] * VERTEX_SIZE + 3));
+    }
   }
 }
 
@@ -522,7 +555,7 @@ auth.onAuthStateChanged(user => {
           console.log("other players present. Retrieve World Data!");
           world.retrieveWorldData().then(() => { 
             world.createChunkMeshes();
-            world.addWorldToScene(scene) 
+            world.addWorldToScene(scene);
           });
         }
       });
@@ -611,7 +644,7 @@ function runGame() {
 
   //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
-  let cameraOffset = new THREE.Vector3(10, 5, 10);
+  let cameraOffset = new THREE.Vector3(10, 5, 0);
   let cameraOrigin = new THREE.Vector3();
   let camOffsetRotation = 0;
 
