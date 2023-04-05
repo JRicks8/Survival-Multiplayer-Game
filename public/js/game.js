@@ -212,8 +212,11 @@ class World {
     this.width = w;
     this.height = h;
     this.depth = d;
-    this.chunkSize = 16;
-    this.chunkMeshes = new Array(Math.ceil(w / 16) * Math.ceil(h / 16) * Math.ceil(d / 16));
+    this.chunkSize = 8;
+    this.chunkNumX = Math.ceil(w / this.chunkSize);
+    this.chunkNumY = Math.ceil(h / this.chunkSize);
+    this.chunkNumZ = Math.ceil(d / this.chunkSize);
+    this.chunkMeshes = new Array(this.chunkNumX * this.chunkNumY * this.chunkNumZ);
 
     // 3d array
     this.bData = new Array(w);
@@ -258,9 +261,9 @@ class World {
   }
 
   forEachChunk(func) {
-    for (let x = 0; x < Math.ceil(this.width / 16); x++) {
-      for (let y = 0; y < Math.ceil(this.height / 16); y++) {
-        for (let z = 0; z < Math.ceil(this.depth / 16); z++) {
+    for (let x = 0; x < this.chunkNumX; x++) {
+      for (let y = 0; y < this.chunkNumY; y++) {
+        for (let z = 0; z < this.chunkNumZ; z++) {
           func(x, y, z);
         }
       }
@@ -287,11 +290,11 @@ class World {
     database.ref(`world/size`).set(size);
 
     // create chunk data 3d array
-    let chunkArr = new Array(Math.ceil(this.width / 16));
+    let chunkArr = new Array(this.chunkNumX);
     for (let x = 0; x < chunkArr.length; x++) {
-      chunkArr[x] = new Array(Math.ceil(this.height / 16));
+      chunkArr[x] = new Array(this.chunkNumY);
       for (let y = 0; y < chunkArr[x].length; y++) {
-        chunkArr[x][y] = new Array(Math.ceil(this.depth / 16));
+        chunkArr[x][y] = new Array(this.chunkNumZ);
       }
     }
 
@@ -300,13 +303,13 @@ class World {
       for (let y = 0; y < this.height; y++) {
         for (let z = 0; z < this.depth; z++) {
           const block = this.bData[x][y][z];
-          const chunkPos = [Math.floor(x / 16), Math.floor(y / 16), Math.floor(z / 16)];
+          const chunkPos = [Math.floor(x / this.chunkSize), Math.floor(y / this.chunkSize), Math.floor(z / this.chunkSize)];
           const blockPos = block.position.toArray();
           const dataStride = 4;
-          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(16 * 16 * 16 * dataStride);
+          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(this.chunkSize * this.chunkSize * this.chunkSize * dataStride);
           // chunkdata is a typed 1d array, so we need to map 3d coordinates to fit in a 1d array. cannot use .push()
-          let localpos = [x % 16, y % 16, z % 16]; // get position of block local to chunk origin
-          let i = (localpos[0] + localpos[1] * 16 + localpos[2] * 16 * 16) * dataStride; // map local position to index in chunk data
+          let localpos = [x % this.chunkSize, y % this.chunkSize, z % this.chunkSize]; // get position of block local to chunk origin
+          let i = (localpos[0] + localpos[1] * this.chunkSize + localpos[2] * this.chunkSize * this.chunkSize) * dataStride; // map local position to index in chunk data
           chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i] = blockPos[0];
           chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 1] = blockPos[1];
           chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 2] = blockPos[2];
@@ -337,9 +340,9 @@ class World {
         this.height = size[1];
         this.depth = size[2];
 
-        for (let x = 0; x < Math.ceil(this.width / 16); x++) {
-          for (let y = 0; y < Math.ceil(this.height / 16); y++) {
-            for (let z = 0; z < Math.ceil(this.depth / 16); z++) {
+        for (let x = 0; x < this.chunkNumX; x++) {
+          for (let y = 0; y < this.chunkNumY; y++) {
+            for (let z = 0; z < this.chunkNumZ; z++) {
               const chunkData = snapshot.child(`chunk_${x}_${y}_${z}`).val();
               for (let i = 0; i < chunkData.length; i += dataStride) {
                 let pos = [chunkData[i], chunkData[i + 1], chunkData[i + 2]];
@@ -361,7 +364,7 @@ class World {
   createChunkMeshes() {
     // I need a vertex array of all verts that I need to render in a chunk
     const chunkMat = new THREE.MeshLambertMaterial({ map: blockSpriteSheet });
-    const chunkArrSize = Math.ceil(this.width / 16) * Math.ceil(this.height / 16) * Math.ceil(this.depth / 16);
+    const chunkArrSize = this.chunkNumX * this.chunkNumY * this.chunkNumZ;
     const chunkVertexBuffers = new Array(chunkArrSize);
     const chunkIndexBuffers = new Array(chunkArrSize);
     const chunkGeos = new Array(chunkArrSize);
@@ -377,9 +380,9 @@ class World {
       // don't check for the bottom neighbor because of camera constraints
 
       if (block.bId === 0) return; // don't render air blocks
-      const chunkPos = [Math.floor(x / 16), Math.floor(y / 16), Math.floor(z / 16)];
+      const chunkPos = [Math.floor(x / this.chunkSize), Math.floor(y / this.chunkSize), Math.floor(z / this.chunkSize)];
       // convert chunk position to chunk 2d array index
-      let i = chunkPos[0] + chunkPos[1] * Math.ceil(this.width / 16) + chunkPos[2] * Math.ceil(this.width / 16) * Math.ceil(this.height / 16);
+      let i = chunkPos[0] + chunkPos[1] * this.chunkNumX + chunkPos[2] * this.chunkNumX * this.chunkNumY;
       if (x + 1 === this.width) { // right face exposed to edge
         chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z], block.bId));
       } else if (!blockRef[this.bData[x + 1][y][z].bId].opaque) { // right block transparent
@@ -457,25 +460,28 @@ class World {
 
     this.forEachChunk((x, y, z) => {
       // convert index to 2d array
-      let i = x + y * Math.ceil(this.width / 16) + z * Math.ceil(this.width / 16) * Math.ceil(this.height / 16);
+      let i = x + y * this.chunkNumX + z * this.chunkNumX * this.chunkNumY;
       this.chunkMeshes[i] = new THREE.Mesh(chunkGeos[i], chunkMat);
     });
+  }
 
-    console.log(chunkIndexBuffers[0].slice(0, 6));
-    for (let i = 0; i < 6; i++) {
-      console.log(chunkVertexBuffers[0].slice(chunkIndexBuffers[0][i] * VERTEX_SIZE, chunkIndexBuffers[0][i] * VERTEX_SIZE + 3));
-    }
+  getChunkMesh(pos) {
+    return this.chunkMeshes[pos[0] + pos[1] * this.chunkNumX + pos[2] * this.chunkNumX * this.chunkNumY]
   }
 }
 
 class Character {
   constructor() {
-    const boxGeo = new THREE.BoxGeometry(0.5, 1.5, 0.5);
+    this.height = 1.5;
+    this.width = 0.5;
+    const boxGeo = new THREE.BoxGeometry(this.width, this.height, this.width);
     const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
     this.mesh = new THREE.Mesh(boxGeo, playerMaterial);
     this.mesh.position.setY(1);
 
-    this.speed = 10;
+    this.playerRaycast = new THREE.Raycaster();
+
+    this.speed = 20;
   }
 
   addToScene(s) {
@@ -490,8 +496,34 @@ class Character {
     this.mesh.position.set(vec3);
   }
 
+  getPosition() {
+    return this.mesh.position.toArray();
+  }
+
   update(dt) {
-    //this.mesh.position.clamp(new THREE.Vector3(-10, 1, -10), new THREE.Vector3(10, 10, 10));
+    const playerPos = this.mesh.position.toArray();
+    const currentChunkPos = [
+      Math.floor(playerPos[0] / world.chunkSize), 
+      Math.floor(playerPos[1] / world.chunkSize), 
+      Math.floor(playerPos[2] / world.chunkSize)
+    ];
+    const nearbyChunks = [];
+    for (let x = -1; x < 2; x++) {
+      for (let y = -1; y < 2; y++) {
+        for (let z = -1; z < 2; z++) {
+          let mesh = world.getChunkMesh([
+            currentChunkPos[0] + x, 
+            currentChunkPos[1] + y, 
+            currentChunkPos[2] + z]);
+          if (mesh == null) continue; 
+          nearbyChunks.push(mesh);
+        }
+      }
+    }
+
+    this.playerRaycast.set(this.mesh.position, new THREE.Vector3(0, -1, 0));
+    this.playerRaycast.far = 0.8;
+    let others = this.playerRaycast.intersectObjects(nearbyChunks);
   }
 
   // attach listeners to a player's character object
@@ -511,7 +543,7 @@ class Character {
 let scene = new THREE.Scene();
 let clientCharacter = new Character();
 let otherCharacters = new Map();
-const world = new World(32, 64, 32);
+const world = new World(64, 64, 64);
 let clientUid;
 
 function resetGameGlobals() {
