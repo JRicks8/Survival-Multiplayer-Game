@@ -24,57 +24,56 @@ const standardBlockGeo = new THREE.BufferGeometry();
 const VERTEX_SIZE = 8;
 
 function getWorldCubeFace(face, pos, bId) {
-  let faceOffset = face / 5;
-  let one = (bId + 1) / blockRef.length + faceOffset;
-  let zero = bId / blockRef.length + faceOffset;
+  let x = bId / blockRef.length;
+  let y = face / 5 + 0.2;
   switch (face) {
     case 0: return [ // front
-      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, one, one,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, zero, zero,
-      -half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, zero, one,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, one, one,
-      half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, one, zero,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, zero, zero
+      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, x + 0.2, y + 0.2,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, x, y,
+      -half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, x, y + 0.2,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, x + 0.2, y + 0.2,
+      half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, x + 0.2, y,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, x, y
     ];
     case 1: return [ // back
-      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, one, one,
-      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, zero, zero,
-      half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, zero, one,
-      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, one, one,
-      -half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, one, zero,
-      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, zero, zero
+      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, x + 0.2, y + 0.2,
+      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, x, y,
+      half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, x, y + 0.2,
+      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, x + 0.2, y + 0.2,
+      -half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, x + 0.2, y,
+      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, x, y
     ];
     case 2: return [ // left
-      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, one, one,
-      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, zero, zero, 
-      -half + pos[0], half + pos[1], half + pos[2], -1, 0, 0, zero, one,
-      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, one, one,
-      -half + pos[0], -half + pos[1], -half + pos[2], -1, 0, 0, one, zero, 
-      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, zero, zero
+      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, x + 0.2, y + 0.2,
+      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, x, y, 
+      -half + pos[0], half + pos[1], half + pos[2], -1, 0, 0, x, y + 0.2,
+      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, x + 0.2, y + 0.2,
+      -half + pos[0], -half + pos[1], -half + pos[2], -1, 0, 0, x + 0.2, y, 
+      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, x, y
     ];
     case 3: return [ // right
-      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, one, one, 
-      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, zero, zero, 
-      half + pos[0], half + pos[1], -half + pos[2], 1, 0, 0, zero, one,
-      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, one, one,
-      half + pos[0], -half + pos[1], half + pos[2], 1, 0, 0, one, zero, 
-      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, zero, zero
+      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, x + 0.2, y + 0.2, 
+      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, x, y, 
+      half + pos[0], half + pos[1], -half + pos[2], 1, 0, 0, x, y + 0.2,
+      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, x + 0.2, y + 0.2,
+      half + pos[0], -half + pos[1], half + pos[2], 1, 0, 0, x + 0.2, y, 
+      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, x, y
     ];
     case 4: return [ // top
-      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, zero, zero,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, one, one, 
-      -half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, zero, one,
-      half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, one, zero,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, one, one, 
-      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, zero, zero
+      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, x, y,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, x + 0.2, y + 0.2, 
+      -half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, x, y + 0.2,
+      half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, x + 0.2, y,
+      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, x + 0.2, y + 0.2, 
+      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, x, y
     ];
     case 5: return [ // bottom
-      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, one, one,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, zero, zero, 
-      half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, one, zero,
-      -half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, zero, one,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, zero, zero, 
-      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, one, one
+      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, x + 0.2, y + 0.2,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, x, y, 
+      half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, x + 0.2, y,
+      -half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, x, y + 0.2,
+      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, x, y, 
+      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, x + 0.2, y + 0.2
     ];
     default: console.log("err: face needs to be an integer 0-5");
   }
@@ -477,11 +476,18 @@ class Character {
     const boxGeo = new THREE.BoxGeometry(this.width, this.height, this.width);
     const playerMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
     this.mesh = new THREE.Mesh(boxGeo, playerMaterial);
-    this.mesh.position.setY(1);
+    this.mesh.position.setX(32);
+    this.mesh.position.setY(64);
+    this.mesh.position.setZ(32);
+
+    this.grounded = false;
+
+    this.gravity = -0.01;
+    this.velocity = new THREE.Vector3(0, 0, 0);
 
     this.playerRaycast = new THREE.Raycaster();
 
-    this.speed = 20;
+    this.speed = 3;
   }
 
   addToScene(s) {
@@ -500,7 +506,24 @@ class Character {
     return this.mesh.position.toArray();
   }
 
+  doPlayerCollisionRaycast(origin, direction, far, objects, onHit) {
+    this.playerRaycast.set(origin, direction);
+    this.playerRaycast.far = far;
+    const others = this.playerRaycast.intersectObjects(objects);
+    if (others.length > 0) {
+      onHit(others[0]);
+    }
+  }
+
+  addVelocity(v) {
+    this.velocity.add(v);
+  } 
+
   update(dt) {
+    this.velocity.setY(this.velocity.y + this.gravity);
+    this.mesh.position.add(this.velocity);
+    this.grounded = false;
+
     const playerPos = this.mesh.position.toArray();
     const currentChunkPos = [
       Math.floor(playerPos[0] / world.chunkSize), 
@@ -515,15 +538,68 @@ class Character {
             currentChunkPos[0] + x, 
             currentChunkPos[1] + y, 
             currentChunkPos[2] + z]);
-          if (mesh == null) continue; 
+          if (mesh == null) continue;
           nearbyChunks.push(mesh);
         }
       }
     }
 
-    this.playerRaycast.set(this.mesh.position, new THREE.Vector3(0, -1, 0));
-    this.playerRaycast.far = 0.8;
-    let others = this.playerRaycast.intersectObjects(nearbyChunks);
+    // raycast down
+    this.doPlayerCollisionRaycast(this.mesh.position, new THREE.Vector3(0, -1, 0), this.height / 2, nearbyChunks, (other) => {
+      this.grounded = true;
+      if (this.velocity.y < 0) {
+          this.mesh.position.setY(other.point.y + this.height / 2);
+          this.velocity.setY(0);
+        }
+    });
+
+    // raycast up
+    this.doPlayerCollisionRaycast(this.mesh.position, new THREE.Vector3(0, 1, 0), this.height / 2, nearbyChunks, (other) => {
+      if (this.velocity.y > 0) {
+        this.mesh.position.setY(other.point.y - this.height / 2);
+        this.velocity.setY(0);
+      }
+    });
+
+    // raycast forward
+    let forward = new THREE.Vector3(this.velocity.x, 0, this.velocity.z).normalize();
+    let feetPos = new THREE.Vector3(this.mesh.position.x, this.mesh.position.y - this.height / 2, this.mesh.position.z);
+    let headPos = new THREE.Vector3(this.mesh.position.x, this.mesh.position.y + this.height / 2, this.mesh.position.z); 
+    // at feet
+    this.doPlayerCollisionRaycast(feetPos, forward, this.width / 2, nearbyChunks, (other) => {
+        this.mesh.position.add(forward.clone().multiplyScalar(other.distance - this.width / 2));
+    });
+
+    // at head
+    this.doPlayerCollisionRaycast(headPos, forward, this.width / 2, nearbyChunks, (other) => {
+      this.mesh.position.add(forward.clone().multiplyScalar(other.distance - this.width / 2));
+    });
+
+    // raycast to x component
+    let xComp = new THREE.Vector3(this.velocity.x, 0, 0).normalize();
+    let far = this.width / 2;
+    // at feet
+    this.doPlayerCollisionRaycast(feetPos, xComp, far, nearbyChunks, (other) => {
+      this.mesh.position.add(xComp.clone().multiplyScalar(other.distance - far));
+    });
+    // at head
+    this.doPlayerCollisionRaycast(headPos, xComp, far, nearbyChunks, (other) => {
+      this.mesh.position.add(xComp.clone().multiplyScalar(other.distance - far));
+    });
+
+    // raycast to z component
+    let zComp = new THREE.Vector3(0, 0, this.velocity.z).normalize();
+    // at feet
+    this.doPlayerCollisionRaycast(feetPos, zComp, far, nearbyChunks, (other) => {
+      this.mesh.position.add(zComp.clone().multiplyScalar(other.distance - far));
+    });
+    // at head
+    this.doPlayerCollisionRaycast(headPos, zComp, far, nearbyChunks, (other) => {
+      this.mesh.position.add(zComp.clone().multiplyScalar(other.distance - far));
+    });
+
+    // simulate drag
+    this.velocity.multiply(new THREE.Vector3(0.2, 1, 0.2));
   }
 
   // attach listeners to a player's character object
@@ -700,11 +776,6 @@ function runGame() {
   clientCharacter.addToScene(scene);
   updateObjects.set("clientCharacter", clientCharacter);
 
-  // game functions
-  function movePlayer(dir) {
-    clientCharacter.mesh.position.add(dir);
-  }
-
   // add input reactions
   let keyManager = new KeyManager();
   updateObjects.set("keyManager", keyManager);
@@ -714,7 +785,7 @@ function runGame() {
     downFunction: dt => {
       let dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       dir.setY(0);
-      movePlayer(dir.multiplyScalar(clientCharacter.speed * dt));
+      clientCharacter.addVelocity(dir.multiplyScalar(clientCharacter.speed * dt));
     },
     pressCallback: () => { },
     upCallback: () => { },
@@ -725,7 +796,7 @@ function runGame() {
     downFunction: dt => {
       let dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       let right = dir.cross(new THREE.Vector3(0, 1, 0));
-      movePlayer(right.multiplyScalar(-clientCharacter.speed * dt));
+      clientCharacter.addVelocity(right.multiplyScalar(-clientCharacter.speed * dt));
     },
     pressCallback: () => { },
     upCallback: () => { },
@@ -736,7 +807,7 @@ function runGame() {
     downFunction: dt => {
       let dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       dir.setY(0);
-      movePlayer(dir.multiplyScalar(-clientCharacter.speed * dt));
+      clientCharacter.addVelocity(dir.multiplyScalar(-clientCharacter.speed * dt));
     },
     pressCallback: () => { },
     upCallback: () => { },
@@ -747,7 +818,7 @@ function runGame() {
     downFunction: dt => {
       let dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
       let right = dir.cross(new THREE.Vector3(0, 1, 0));
-      movePlayer(right.multiplyScalar(clientCharacter.speed * dt));
+      clientCharacter.addVelocity(right.multiplyScalar(clientCharacter.speed * dt));
     },
     pressCallback: () => { },
     upCallback: () => { },
@@ -757,7 +828,7 @@ function runGame() {
     down: false,
     downFunction: dt => {
       let up = new THREE.Vector3(0, 1, 0);
-      movePlayer(up.multiplyScalar(clientCharacter.speed * dt));
+      clientCharacter.addVelocity(up.multiplyScalar(clientCharacter.speed * dt));
     },
     pressCallback: () => {},
     upCallback: () => {},
@@ -767,7 +838,7 @@ function runGame() {
     down: false,
     downFunction: dt => {
       let up = new THREE.Vector3(0, 1, 0);
-      movePlayer(up.multiplyScalar(-clientCharacter.speed * dt));
+      clientCharacter.addVelocity(up.multiplyScalar(-clientCharacter.speed * dt));
     },
     pressCallback: () => {},
     upCallback: () => {},
@@ -789,6 +860,15 @@ function runGame() {
     },
     pressCallback: () => { },
     upCallback: () => { },
+  });
+
+  keyManager.addKey("Space", {
+    down: false,
+    downFunction: dt => {},
+    pressCallback: () => {
+      if (clientCharacter.grounded) clientCharacter.addVelocity(new THREE.Vector3(0, 0.18, 0));
+    },
+    upCallback: () => {},
   });
 
   // aux variables
