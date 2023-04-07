@@ -7,9 +7,20 @@ if (location.hostname === "localhost") { // point to emulator if using it
   auth.useEmulator("http://localhost:9099");
 }
 
+// globals
+const contentWrapper = document.querySelector(".content");
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+const pointer = new THREE.Vector2();
+function onPointerMove(event) {
+  const rect = contentWrapper.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / contentWrapper.clientWidth) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / contentWrapper.clientHeight) * 2 + 1;
+}
+contentWrapper.addEventListener("pointermove", onPointerMove, false);
 
 // sprite sheet
 const blockSpriteSheet = new THREE.TextureLoader().load("../images/block-textures.png");
@@ -139,31 +150,26 @@ const cubeVertexBuffer = new Float32Array([
 const blockRef = [
   {//0
     name: "air",
-    material: new THREE.MeshLambertMaterial({ transparent: true, opacity: 0 }),
     geometry: standardBlockGeo,
     opaque: false,
   },
   {//1
     name: "banded iron",
-    material: new THREE.MeshLambertMaterial({ color: 0x000000 }),
     geometry: standardBlockGeo,
     opaque: true
   },
   {//2
     name: "stone",
-    material: new THREE.MeshLambertMaterial({ color: 0x847E87 }),
     geometry: standardBlockGeo,
     opaque: true
   },
   {//3
     name: "dirt",
-    material: new THREE.MeshLambertMaterial({ color: 0x8F563B }),
     geometry: standardBlockGeo,
     opaque: true
   },
   {//4
     name: "grass",
-    material: new THREE.MeshLambertMaterial({ color: 0x6ABE30 }),
     geometry: standardBlockGeo,
     opaque: true
   },
@@ -485,7 +491,7 @@ class Character {
     this.gravity = -0.01;
     this.velocity = new THREE.Vector3(0, 0, 0);
 
-    this.playerRaycast = new THREE.Raycaster();
+    this.characterRaycast = new THREE.Raycaster();
 
     this.speed = 3;
   }
@@ -498,18 +504,18 @@ class Character {
     s.remove(this.mesh);
   }
 
-  setPosition(vec3) {
-    this.mesh.position.set(vec3);
+  setPosition(x, y, z) {
+    this.mesh.position.set(x, y, z);
   }
 
   getPosition() {
     return this.mesh.position.toArray();
   }
 
-  doPlayerCollisionRaycast(origin, direction, far, objects, onHit) {
-    this.playerRaycast.set(origin, direction);
-    this.playerRaycast.far = far;
-    const others = this.playerRaycast.intersectObjects(objects);
+  doCharacterCollisionRaycast(origin, direction, far, objects, onHit) {
+    this.characterRaycast.set(origin, direction);
+    this.characterRaycast.far = far;
+    const others = this.characterRaycast.intersectObjects(objects);
     if (others.length > 0) {
       onHit(others[0]);
     }
@@ -521,14 +527,13 @@ class Character {
 
   update(dt) {
     this.velocity.setY(this.velocity.y + this.gravity);
-    this.mesh.position.add(this.velocity);
+    let newPos = new THREE.Vector3().addVectors(this.mesh.position, this.velocity);
     this.grounded = false;
 
-    const playerPos = this.mesh.position.toArray();
     const currentChunkPos = [
-      Math.floor(playerPos[0] / world.chunkSize), 
-      Math.floor(playerPos[1] / world.chunkSize), 
-      Math.floor(playerPos[2] / world.chunkSize)
+      Math.floor(this.mesh.position.x / world.chunkSize), 
+      Math.floor(this.mesh.position.y / world.chunkSize), 
+      Math.floor(this.mesh.position.z / world.chunkSize)
     ];
     const nearbyChunks = [];
     for (let x = -1; x < 2; x++) {
@@ -545,60 +550,61 @@ class Character {
     }
 
     // raycast down
-    this.doPlayerCollisionRaycast(this.mesh.position, new THREE.Vector3(0, -1, 0), this.height / 2, nearbyChunks, (other) => {
+    this.doCharacterCollisionRaycast(newPos, new THREE.Vector3(0, -1, 0), this.height / 2, nearbyChunks, (other) => {
       this.grounded = true;
       if (this.velocity.y < 0) {
-          this.mesh.position.setY(other.point.y + this.height / 2);
+          newPos.setY(other.point.y + this.height / 2);
           this.velocity.setY(0);
         }
     });
 
     // raycast up
-    this.doPlayerCollisionRaycast(this.mesh.position, new THREE.Vector3(0, 1, 0), this.height / 2, nearbyChunks, (other) => {
+    this.doCharacterCollisionRaycast(newPos, new THREE.Vector3(0, 1, 0), this.height / 2, nearbyChunks, (other) => {
       if (this.velocity.y > 0) {
-        this.mesh.position.setY(other.point.y - this.height / 2);
+        newPos.setY(other.point.y - this.height / 2);
         this.velocity.setY(0);
       }
     });
 
     // raycast forward
     let forward = new THREE.Vector3(this.velocity.x, 0, this.velocity.z).normalize();
-    let feetPos = new THREE.Vector3(this.mesh.position.x, this.mesh.position.y - this.height / 2, this.mesh.position.z);
-    let headPos = new THREE.Vector3(this.mesh.position.x, this.mesh.position.y + this.height / 2, this.mesh.position.z); 
+    let feetPos = new THREE.Vector3(newPos.x, newPos.y - this.height / 2, newPos.z);
+    let headPos = new THREE.Vector3(newPos.x, newPos.y + this.height / 2, newPos.z); 
     // at feet
-    this.doPlayerCollisionRaycast(feetPos, forward, this.width / 2, nearbyChunks, (other) => {
-        this.mesh.position.add(forward.clone().multiplyScalar(other.distance - this.width / 2));
+    this.doCharacterCollisionRaycast(feetPos, forward, this.width / 2, nearbyChunks, (other) => {
+        newPos.add(forward.clone().multiplyScalar(other.distance - this.width / 2));
     });
 
     // at head
-    this.doPlayerCollisionRaycast(headPos, forward, this.width / 2, nearbyChunks, (other) => {
-      this.mesh.position.add(forward.clone().multiplyScalar(other.distance - this.width / 2));
+    this.doCharacterCollisionRaycast(headPos, forward, this.width / 2, nearbyChunks, (other) => {
+      newPos.add(forward.clone().multiplyScalar(other.distance - this.width / 2));
     });
 
     // raycast to x component
     let xComp = new THREE.Vector3(this.velocity.x, 0, 0).normalize();
     let far = this.width / 2;
     // at feet
-    this.doPlayerCollisionRaycast(feetPos, xComp, far, nearbyChunks, (other) => {
-      this.mesh.position.add(xComp.clone().multiplyScalar(other.distance - far));
+    this.doCharacterCollisionRaycast(feetPos, xComp, far, nearbyChunks, (other) => {
+      newPos.add(xComp.clone().multiplyScalar(other.distance - far));
     });
     // at head
-    this.doPlayerCollisionRaycast(headPos, xComp, far, nearbyChunks, (other) => {
-      this.mesh.position.add(xComp.clone().multiplyScalar(other.distance - far));
+    this.doCharacterCollisionRaycast(headPos, xComp, far, nearbyChunks, (other) => {
+      newPos.add(xComp.clone().multiplyScalar(other.distance - far));
     });
 
     // raycast to z component
     let zComp = new THREE.Vector3(0, 0, this.velocity.z).normalize();
     // at feet
-    this.doPlayerCollisionRaycast(feetPos, zComp, far, nearbyChunks, (other) => {
-      this.mesh.position.add(zComp.clone().multiplyScalar(other.distance - far));
+    this.doCharacterCollisionRaycast(feetPos, zComp, far, nearbyChunks, (other) => {
+      newPos.add(zComp.clone().multiplyScalar(other.distance - far));
     });
     // at head
-    this.doPlayerCollisionRaycast(headPos, zComp, far, nearbyChunks, (other) => {
-      this.mesh.position.add(zComp.clone().multiplyScalar(other.distance - far));
+    this.doCharacterCollisionRaycast(headPos, zComp, far, nearbyChunks, (other) => {
+      newPos.add(zComp.clone().multiplyScalar(other.distance - far));
     });
 
     // simulate drag
+    this.setPosition(newPos.x, newPos.y, newPos.z);
     this.velocity.multiply(new THREE.Vector3(0.2, 1, 0.2));
   }
 
@@ -615,9 +621,67 @@ class Character {
   }
 }
 
+class Player {
+  constructor(character) {
+    this.character = character;
+
+    this.buildDistance = 4;
+
+    // preview block
+    const previewBlockGeo = new THREE.BoxGeometry(1, 1, 1);
+    this.previewBlockMaterialLegal = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.5,
+      color: 0x00ff00
+    });
+    this.previewBlockMaterialIllegal = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.5,
+      color: 0xff0000
+    });
+    this.previewBlockMesh = new THREE.Mesh(previewBlockGeo, this.previewBlockMaterialLegal);
+    this.previewBlockInScene = false;
+
+    this.playerRaycast = new THREE.Raycaster();
+  }
+
+  doPlayerPointerRaycast() {
+    this.playerRaycast.setFromCamera(pointer, this.camera);
+    const others = this.playerRaycast.intersectObjects(world.chunkMeshes);
+    if (others.length > 0) {
+      return others[0];
+    }
+  }
+
+  update(dt) {
+    const mousePoint = this.doPlayerPointerRaycast();
+    if (mousePoint != null) { // if hit terrain
+      if (!this.previewBlockInScene) { // add preview block to scene
+        this.previewBlockInScene = true;
+        scene.add(this.previewBlockMesh);
+      }
+      this.previewBlockMesh.position.set(
+        Math.round(mousePoint.point.x + mousePoint.normal.x * 0.1), 
+        Math.round(mousePoint.point.y + mousePoint.normal.y * 0.1), 
+        Math.round(mousePoint.point.z + mousePoint.normal.z * 0.1));
+      if (this.previewBlockMesh.position.distanceTo(this.character.mesh.position) > this.buildDistance) {
+        this.previewBlockMesh.material = this.previewBlockMaterialIllegal;
+      } else {
+        this.previewBlockMesh.material = this.previewBlockMaterialLegal;
+      }
+    } else { // didn't hit anything
+      if (this.previewBlockInScene) { // remove preview block from scene
+        this.previewBlockInScene = false;
+        scene.remove(this.previewBlockMesh);
+      }
+    }
+  }
+}
+
 // needed globals
 let scene = new THREE.Scene();
 let clientCharacter = new Character();
+let clientPlayer = new Player(clientCharacter);
 let otherCharacters = new Map();
 const world = new World(64, 64, 64);
 let clientUid;
@@ -748,13 +812,14 @@ function initGame() {
 
 function runGame() {
   // basic world setup
-  const contentWrapper = document.querySelector(".content");
-
   //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
   let cameraOffset = new THREE.Vector3(10, 5, 0);
   let cameraOrigin = new THREE.Vector3();
   let camOffsetRotation = 0;
+
+  // set player camera
+  clientPlayer.camera = camera;
 
   const renderer = new THREE.WebGLRenderer({ alpha: true });
   renderer.setSize(contentWrapper.clientWidth, contentWrapper.clientHeight);
@@ -772,9 +837,10 @@ function runGame() {
   // ALL objects added to this map MUST have a .update(dt) function implemented.
   let updateObjects = new Map();
 
-  // player
+  // player & character
   clientCharacter.addToScene(scene);
   updateObjects.set("clientCharacter", clientCharacter);
+  updateObjects.set("clientPlayer", clientPlayer);
 
   // add input reactions
   let keyManager = new KeyManager();
