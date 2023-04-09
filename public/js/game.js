@@ -1,4 +1,12 @@
 import * as THREE from "https://unpkg.com/three/build/three.module.js";
+import { World, blockRef } from "./world.js";
+import {
+  BLOCK_AIR,
+  BLOCK_BANDEDIRON,
+  BLOCK_STONE,
+  BLOCK_DIRT,
+  BLOCK_GRASS
+} from "./world.js";
 
 const database = firebase.database();
 const auth = firebase.auth();
@@ -9,6 +17,7 @@ if (location.hostname === "localhost") { // point to emulator if using it
 
 // globals
 const contentWrapper = document.querySelector(".content");
+const keyManager = new KeyManager();
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -20,460 +29,9 @@ function onPointerMove(event) {
   pointer.x = ((event.clientX - rect.left) / contentWrapper.clientWidth) * 2 - 1;
   pointer.y = -((event.clientY - rect.top) / contentWrapper.clientHeight) * 2 + 1;
 }
+
 contentWrapper.addEventListener("pointermove", onPointerMove, false);
 
-// sprite sheet
-const blockSpriteSheet = new THREE.TextureLoader().load("../images/block-textures.png");
-blockSpriteSheet.wrapS = THREE.ClampToEdgeWrapping;
-blockSpriteSheet.wrapT = THREE.ClampToEdgeWrapping;
-blockSpriteSheet.magFilter = THREE.NearestFilter;
-blockSpriteSheet.minFilter = THREE.NearestMipmapNearestFilter;
-
-// create geo for tiles
-const half = 0.5;
-const standardBlockGeo = new THREE.BufferGeometry();
-const VERTEX_SIZE = 8;
-
-function getWorldCubeFace(face, pos, bId) {
-  let x = bId / blockRef.length;
-  let y = face / 5 + 0.2;
-  switch (face) {
-    case 0: return [ // front
-      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, x + 0.2, y + 0.2,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, x, y,
-      -half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, x, y + 0.2,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 0, -1, x + 0.2, y + 0.2,
-      half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, x + 0.2, y,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, 0, -1, x, y
-    ];
-    case 1: return [ // back
-      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, x + 0.2, y + 0.2,
-      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, x, y,
-      half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, x, y + 0.2,
-      -half + pos[0], half + pos[1], half + pos[2], 0, 0, 1, x + 0.2, y + 0.2,
-      -half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, x + 0.2, y,
-      half + pos[0], -half + pos[1], half + pos[2], 0, 0, 1, x, y
-    ];
-    case 2: return [ // left
-      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, x + 0.2, y + 0.2,
-      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, x, y, 
-      -half + pos[0], half + pos[1], half + pos[2], -1, 0, 0, x, y + 0.2,
-      -half + pos[0], half + pos[1], -half + pos[2], -1, 0, 0, x + 0.2, y + 0.2,
-      -half + pos[0], -half + pos[1], -half + pos[2], -1, 0, 0, x + 0.2, y, 
-      -half + pos[0], -half + pos[1], half + pos[2], -1, 0, 0, x, y
-    ];
-    case 3: return [ // right
-      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, x + 0.2, y + 0.2, 
-      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, x, y, 
-      half + pos[0], half + pos[1], -half + pos[2], 1, 0, 0, x, y + 0.2,
-      half + pos[0], half + pos[1], half + pos[2], 1, 0, 0, x + 0.2, y + 0.2,
-      half + pos[0], -half + pos[1], half + pos[2], 1, 0, 0, x + 0.2, y, 
-      half + pos[0], -half + pos[1], -half + pos[2], 1, 0, 0, x, y
-    ];
-    case 4: return [ // top
-      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, x, y,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, x + 0.2, y + 0.2, 
-      -half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, x, y + 0.2,
-      half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, x + 0.2, y,
-      half + pos[0], half + pos[1], -half + pos[2], 0, 1, 0, x + 0.2, y + 0.2, 
-      -half + pos[0], half + pos[1], half + pos[2], 0, 1, 0, x, y
-    ];
-    case 5: return [ // bottom
-      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, x + 0.2, y + 0.2,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, x, y, 
-      half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, x + 0.2, y,
-      -half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, x, y + 0.2,
-      -half + pos[0], -half + pos[1], -half + pos[2], 0, -1, 0, x, y, 
-      half + pos[0], -half + pos[1], half + pos[2], 0, -1, 0, x + 0.2, y + 0.2
-    ];
-    default: console.log("err: face needs to be an integer 0-5");
-  }
-}
-const cubeVertexBuffer = new Float32Array([
-  // Front
-  -half, half, half, 0, 0, -1, 0, 1,
-  half, half, half, 0, 0, -1, 1, 1,
-  -half, -half, half, 0, 0, -1, 0, 0,
-  half, -half, half, 0, 0, -1, 1, 0,
-  // Back
-  half, half, -half, 0, 0, 1, 0, 1,
-  -half, half, -half, 0, 0, 1, 1, 1,
-  half, -half, -half, 0, 0, 1, 0, 0,
-  -half, -half, -half, 0, 0, 1, 1, 0,
-  // Left
-  -half, half, -half, -1, 0, 0, 0, 1,
-  -half, half, half, -1, 0, 0, 1, 1,
-  -half, -half, -half, -1, 0, 0, 0, 0,
-  -half, -half, half, -1, 0, 0, 1, 0,
-  // Right
-  half, half, half, 1, 0, 0, 0, 1,
-  half, half, -half, 1, 0, 0, 1, 1,
-  half, -half, half, 1, 0, 0, 0, 0,
-  half, -half, -half, 1, 0, 0, 1, 0,
-  // Top
-  -half, half, half, 0, 1, 0, 0, 1,
-  half, half, half, 0, 1, 0, 1, 1,
-  -half, half, -half, 0, 1, 0, 0, 0,
-  half, half, -half, 0, 1, 0, 1, 0,
-  // Bottom
-  half, -half, half, 0, -1, 0, 1, 0,
-  -half, -half, half, 0, -1, 0, 0, 0,
-  half, -half, -half, 0, -1, 0, 1, 1,
-  -half, -half, -half, 0, -1, 0, 0, 1,
-]);
-// standardTileGeo vertex buffer & index buffer
-{
-  const vertexBuffer = new THREE.InterleavedBuffer(cubeVertexBuffer, VERTEX_SIZE);
-
-  const indices = new Uint16Array([
-    0, 2, 1,
-    2, 3, 1,
-    4, 6, 5,
-    6, 7, 5,
-    8, 10, 9,
-    10, 11, 9,
-    12, 14, 13,
-    14, 15, 13,
-    16, 17, 18,
-    18, 17, 19,
-    20, 21, 22,
-    22, 21, 23
-  ]);
-
-  standardBlockGeo.setIndex(new THREE.BufferAttribute(indices, 1));
-  standardBlockGeo.setAttribute("position", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 0));
-  standardBlockGeo.setAttribute("normal", new THREE.InterleavedBufferAttribute(vertexBuffer, 3, 3));
-  standardBlockGeo.setAttribute("uv", new THREE.InterleavedBufferAttribute(vertexBuffer, 2, 6));
-}
-
-// the blockref has an array of all of the possible blocks
-const blockRef = [
-  {//0
-    name: "air",
-    geometry: standardBlockGeo,
-    opaque: false,
-  },
-  {//1
-    name: "banded iron",
-    geometry: standardBlockGeo,
-    opaque: true
-  },
-  {//2
-    name: "stone",
-    geometry: standardBlockGeo,
-    opaque: true
-  },
-  {//3
-    name: "dirt",
-    geometry: standardBlockGeo,
-    opaque: true
-  },
-  {//4
-    name: "grass",
-    geometry: standardBlockGeo,
-    opaque: true
-  },
-];
-
-class Block {
-  constructor(bId = 0, pos = new THREE.Vector3(0,0,0)) {
-    this.bId = bId;
-    this.position = pos;
-  }
-}
-
-class LayeredNoise {
-  constructor(scale, octaves, persistance, lacunarity) {
-    this.scale = scale;
-    this.octaves = octaves;
-    this.persistance = persistance;
-    this.lacunarity = lacunarity;
-  }
-
-  getNoise(x, y, z = 0) {
-    let amplitude = 1;
-    let frequency = 1;
-    let outNoise = 0;
-
-    for (let i = 0; i < this.octaves; i++) {
-      let sampleX = x / this.scale * frequency;
-      let sampleY = y / this.scale * frequency;
-      let sampleZ = z / this.scale * frequency;
-
-      let n = noise.simplex3(sampleX, sampleY, sampleZ);
-      outNoise += n * amplitude;
-
-      amplitude *= this.persistance;
-      frequency *= this.lacunarity;
-    }
-
-    return outNoise;
-  }
-}
-
-class World {
-  constructor(w, h, d) {
-    // initialize block data 3d array
-    this.width = w;
-    this.height = h;
-    this.depth = d;
-    this.chunkSize = 8;
-    this.chunkNumX = Math.ceil(w / this.chunkSize);
-    this.chunkNumY = Math.ceil(h / this.chunkSize);
-    this.chunkNumZ = Math.ceil(d / this.chunkSize);
-    this.chunkMeshes = new Array(this.chunkNumX * this.chunkNumY * this.chunkNumZ);
-
-    // 3d array
-    this.bData = new Array(w);
-    for (let i = 0; i < this.bData.length; i++) {
-      this.bData[i] = new Array(h);
-      for (let j = 0; j < this.bData[i].length; j++) {
-        this.bData[i][j] = new Array(d);
-      }
-    }
-    this.seed = Math.round(Math.random() * 65536);
-    noise.seed(this.seed);
-  }
-
-  generate() {
-    let layeredNoise = new LayeredNoise(20, 4, 0.5, 1.5);
-    let surfaceHeightVariance = 4;
-    let surfaceLevel = Math.round(this.height * 0.7);
-
-    // generate hills and valleys
-    this.forEachBlock((block, x, y, z) => { // x, y, z is the position of the block in array
-      let n = layeredNoise.getNoise(x, z);
-      n = Math.round(n * surfaceHeightVariance) + surfaceLevel;
-
-      if (y === n) this.bData[x][y][z] = new Block(4, new THREE.Vector3(x, y, z));
-      else if (y < n) this.bData[x][y][z] = new Block(3, new THREE.Vector3(x, y, z));
-      else {
-        this.bData[x][y][z] = new Block(0, new THREE.Vector3(x, y, z));
-        return;
-      }
-    });
-  }
-
-  // RETURNS A COPY OF THE BLOCK, NOT REFERENCE. WHY? I DONT KNOW!
-  forEachBlock(func) {
-    for (let x = 0; x < this.bData.length; x++) {
-      for (let y = 0; y < this.bData[x].length; y++) {
-        for (let z = 0; z < this.bData[x][y].length; z++) {
-          func(this.bData[x][y][z], x, y, z);
-        }
-      }
-    }
-  }
-
-  forEachChunk(func) {
-    for (let x = 0; x < this.chunkNumX; x++) {
-      for (let y = 0; y < this.chunkNumY; y++) {
-        for (let z = 0; z < this.chunkNumZ; z++) {
-          func(x, y, z);
-        }
-      }
-    }
-  }
-
-  // sends data of ENTIRE WORLD
-  // ONLY USE when generating a new world.
-  async sendWorldData() {
-    // DATA STRUCTURE
-    // World
-      // seed (int)
-      // Size [w, h, d] (arr)
-      // chunk_X_Y_Z
-        // block data [X, Y, Z, ID#, X, Y, Z, ID#] (multiple blocks stored into one array for efficient storage)
-    // END
-    
-    database.ref(`world`).set(null); // erase all
-    database.ref(`world/seed`).set(this.seed);
-    let size = new Uint8Array(3);
-    size[0] = this.width;
-    size[1] = this.height;
-    size[2] = this.depth;
-    database.ref(`world/size`).set(size);
-
-    // create chunk data 3d array
-    let chunkArr = new Array(this.chunkNumX);
-    for (let x = 0; x < chunkArr.length; x++) {
-      chunkArr[x] = new Array(this.chunkNumY);
-      for (let y = 0; y < chunkArr[x].length; y++) {
-        chunkArr[x][y] = new Array(this.chunkNumZ);
-      }
-    }
-
-    // add block data to each chunk
-    for (let x = 0; x < this.width; x++) {
-      for (let y = 0; y < this.height; y++) {
-        for (let z = 0; z < this.depth; z++) {
-          const block = this.bData[x][y][z];
-          const chunkPos = [Math.floor(x / this.chunkSize), Math.floor(y / this.chunkSize), Math.floor(z / this.chunkSize)];
-          const blockPos = block.position.toArray();
-          const dataStride = 4;
-          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(this.chunkSize * this.chunkSize * this.chunkSize * dataStride);
-          // chunkdata is a typed 1d array, so we need to map 3d coordinates to fit in a 1d array. cannot use .push()
-          let localpos = [x % this.chunkSize, y % this.chunkSize, z % this.chunkSize]; // get position of block local to chunk origin
-          let i = (localpos[0] + localpos[1] * this.chunkSize + localpos[2] * this.chunkSize * this.chunkSize) * dataStride; // map local position to index in chunk data
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i] = blockPos[0];
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 1] = blockPos[1];
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 2] = blockPos[2];
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 3] = block.bId;
-        }
-      }
-    }
-
-    // send updates to server
-    for (let x = 0; x < chunkArr.length; x++) {
-      for (let y = 0; y < chunkArr[x].length; y++) {
-        for (let z = 0; z < chunkArr[x][y].length; z++) {
-          database.ref(`world/chunk_${x}_${y}_${z}`).set(chunkArr[x][y][z]);
-        }
-      }
-    }
-  }
-
-  // gets world data from server
-  async retrieveWorldData() {
-    // for each chunk
-    const dataStride = 4;
-    await database.ref(`world`).get().then((snapshot) => {
-      if (snapshot.exists()) {
-        this.seed = snapshot.child("seed").val();
-        let size = snapshot.child("size").val();
-        this.width = size[0];
-        this.height = size[1];
-        this.depth = size[2];
-
-        for (let x = 0; x < this.chunkNumX; x++) {
-          for (let y = 0; y < this.chunkNumY; y++) {
-            for (let z = 0; z < this.chunkNumZ; z++) {
-              const chunkData = snapshot.child(`chunk_${x}_${y}_${z}`).val();
-              for (let i = 0; i < chunkData.length; i += dataStride) {
-                let pos = [chunkData[i], chunkData[i + 1], chunkData[i + 2]];
-                this.bData[pos[0]][pos[1]][pos[2]] = new Block(chunkData[i + 3], new THREE.Vector3(pos[0], pos[1], pos[2]));
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-
-  addWorldToScene(s) {
-    for (let i = 0; i < this.chunkMeshes.length; i++) {
-      s.add(this.chunkMeshes[i]);
-    }
-  }
-
-  createChunkMeshes() {
-    // I need a vertex array of all verts that I need to render in a chunk
-    const chunkMat = new THREE.MeshLambertMaterial({ map: blockSpriteSheet });
-    const chunkArrSize = this.chunkNumX * this.chunkNumY * this.chunkNumZ;
-    const chunkVertexBuffers = new Array(chunkArrSize);
-    const chunkIndexBuffers = new Array(chunkArrSize);
-    const chunkGeos = new Array(chunkArrSize);
-    for (let i = 0; i < chunkArrSize; i++) {
-      chunkVertexBuffers[i] = [];
-      chunkIndexBuffers[i] = [];
-      chunkGeos[i] = new THREE.BufferGeometry();
-    }
-
-    // add block vertices to vertex buffer if necessary
-    this.forEachBlock((block, x, y, z) => {
-      // if any neighbors are oob or transparent, we need to keep rendering the face
-      // don't check for the bottom neighbor because of camera constraints
-
-      if (block.bId === 0) return; // don't render air blocks
-      const chunkPos = [Math.floor(x / this.chunkSize), Math.floor(y / this.chunkSize), Math.floor(z / this.chunkSize)];
-      // convert chunk position to chunk 2d array index
-      let i = chunkPos[0] + chunkPos[1] * this.chunkNumX + chunkPos[2] * this.chunkNumX * this.chunkNumY;
-      if (x + 1 === this.width) { // right face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z], block.bId));
-      } else if (!blockRef[this.bData[x + 1][y][z].bId].opaque) { // right block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(3, [x, y, z], block.bId));
-      }
-      if (x - 1 < 0) { // left face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z], block.bId));
-      } else if (!blockRef[this.bData[x - 1][y][z].bId].opaque) { // left block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(2, [x, y, z], block.bId));
-      }
-      if (y + 1 === this.height) { // top face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z], block.bId));
-      } else if (!blockRef[this.bData[x][y + 1][z].bId].opaque) { // top block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(4, [x, y, z], block.bId));
-      }
-      if (z + 1 === this.depth) { // back face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z], block.bId));
-      } else if (!blockRef[this.bData[x][y][z + 1].bId].opaque) { // back block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(1, [x, y, z], block.bId));
-      }
-      if (z - 1 < 0) { // front face exposed to edge
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z], block.bId));
-      } else if (!blockRef[this.bData[x][y][z - 1].bId].opaque) { // front block transparent
-        chunkVertexBuffers[i] = chunkVertexBuffers[i].concat(getWorldCubeFace(0, [x, y, z], block.bId));
-      }
-    });
-
-    // index the vertex buffers and push to chunkIndexBuffers array
-    for (let chunkIndex = 0; chunkIndex < chunkArrSize; chunkIndex++) { // for each chunk
-      let outVb = [];
-      let outIb = [];
-
-      // for each input vertex
-      for (let i = 0; i < chunkVertexBuffers[chunkIndex].length; i += VERTEX_SIZE) {
-        // extract the vertex for comparison
-        let vertex = chunkVertexBuffers[chunkIndex].slice(i, i + VERTEX_SIZE);
-        
-        let index = undefined;
-        // look in outVb for the same vertex
-        for (let j = 0; j < outVb.length; j += VERTEX_SIZE) { // for each vert in output
-          if (vertex[0] == outVb[j] &&
-            vertex[1] == outVb[j + 1] &&
-            vertex[2] == outVb[j + 2] &&
-            vertex[3] == outVb[j + 3] &&
-            vertex[4] == outVb[j + 4] &&
-            vertex[5] == outVb[j + 5] &&
-            vertex[6] == outVb[j + 6] &&
-            vertex[7] == outVb[j + 7]) { // if there is a similar vertex in input buffer
-            index = j / VERTEX_SIZE;
-            break;
-          }
-        }
-
-        if (index == undefined) { // if the vertex is not in the output already
-          outVb = outVb.concat(vertex);
-          outIb.push(outVb.length / VERTEX_SIZE - 1);
-
-        } else { // else, push the existing vertex's index to the index buffer
-          outIb.push(index);
-        }
-      }
-
-      chunkVertexBuffers[chunkIndex] = outVb;
-      chunkIndexBuffers[chunkIndex] = outIb;
-    }
-
-    for (let i = 0; i < chunkArrSize; i++) {
-      // set geometry vertex and index buffers
-      chunkGeos[i].setIndex(new THREE.BufferAttribute(Uint16Array.from(chunkIndexBuffers[i]), 1));
-      const vBuff = new THREE.InterleavedBuffer(Float32Array.from(chunkVertexBuffers[i]), VERTEX_SIZE);
-      chunkGeos[i].setAttribute("position", new THREE.InterleavedBufferAttribute(vBuff, 3, 0));
-      chunkGeos[i].setAttribute("normal", new THREE.InterleavedBufferAttribute(vBuff, 3, 3));
-      chunkGeos[i].setAttribute("uv", new THREE.InterleavedBufferAttribute(vBuff, 2, 6));
-    }
-
-    this.forEachChunk((x, y, z) => {
-      // convert index to 2d array
-      let i = x + y * this.chunkNumX + z * this.chunkNumX * this.chunkNumY;
-      this.chunkMeshes[i] = new THREE.Mesh(chunkGeos[i], chunkMat);
-    });
-  }
-
-  getChunkMesh(pos) {
-    return this.chunkMeshes[pos[0] + pos[1] * this.chunkNumX + pos[2] * this.chunkNumX * this.chunkNumY]
-  }
-}
 
 class Character {
   constructor() {
@@ -530,21 +88,13 @@ class Character {
     let newPos = new THREE.Vector3().addVectors(this.mesh.position, this.velocity);
     this.grounded = false;
 
-    const currentChunkPos = [
-      Math.floor(this.mesh.position.x / world.chunkSize), 
-      Math.floor(this.mesh.position.y / world.chunkSize), 
-      Math.floor(this.mesh.position.z / world.chunkSize)
-    ];
     const nearbyChunks = [];
     for (let x = -1; x < 2; x++) {
       for (let y = -1; y < 2; y++) {
         for (let z = -1; z < 2; z++) {
-          let mesh = world.getChunkMesh([
-            currentChunkPos[0] + x, 
-            currentChunkPos[1] + y, 
-            currentChunkPos[2] + z]);
-          if (mesh == null) continue;
-          nearbyChunks.push(mesh);
+          let i = world.getChunkMeshIndexFromWorldPos([this.mesh.position.x + x, this.mesh.position.y + y, this.mesh.position.z + z]);
+          if (world.chunkMeshes[i] == null) continue;
+          nearbyChunks.push(world.chunkMeshes[i]);
         }
       }
     }
@@ -568,7 +118,7 @@ class Character {
 
     // raycast forward
     let forward = new THREE.Vector3(this.velocity.x, 0, this.velocity.z).normalize();
-    let feetPos = new THREE.Vector3(newPos.x, newPos.y - this.height / 2, newPos.z);
+    let feetPos = new THREE.Vector3(newPos.x, newPos.y - this.height / 2 + 0.1, newPos.z);
     let headPos = new THREE.Vector3(newPos.x, newPos.y + this.height / 2, newPos.z); 
     // at feet
     this.doCharacterCollisionRaycast(feetPos, forward, this.width / 2, nearbyChunks, (other) => {
@@ -626,9 +176,13 @@ class Player {
     this.character = character;
 
     this.buildDistance = 4;
+    this.MODE_BUILD = 0;
+    this.MODE_DELETE = 1;
+    this.mode = this.MODE_BUILD;
+    this.activeBlock = BLOCK_STONE;
 
     // preview block
-    const previewBlockGeo = new THREE.BoxGeometry(1, 1, 1);
+    const previewBlockGeo = new THREE.BoxGeometry(1.01, 1.01, 1.01);
     this.previewBlockMaterialLegal = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0.5,
@@ -643,37 +197,118 @@ class Player {
     this.previewBlockInScene = false;
 
     this.playerRaycast = new THREE.Raycaster();
+
+    this.onMouseClick = (event) => {
+      switch (event.button) {
+        case 0: // LMB
+          this.trySetBlock(event, this.activeBlock);
+          break;
+        case 1: // MMB
+
+          break;
+        case 2: // RMB
+
+          break;
+      }
+    }
+    contentWrapper.addEventListener("click", this.onMouseClick, false);
+
+    // press 1 key for building
+    keyManager.addKey("Digit1", {
+      down: false,
+      downFunction: dt => {},
+      pressCallback: () => {
+        this.mode = this.MODE_BUILD;
+        this.activeBlock = BLOCK_STONE;
+      },
+      upCallback: () => {},
+    });
+
+    // press 2 key for deletion
+    keyManager.addKey("Digit2", {
+      down: false,
+      downFunction: dt => {},
+      pressCallback: () => {
+        this.mode = this.MODE_DELETE;
+        this.activeBlock = BLOCK_AIR;
+      },
+      upCallback: () => {},
+    });
   }
 
   doPlayerPointerRaycast() {
     this.playerRaycast.setFromCamera(pointer, this.camera);
-    const others = this.playerRaycast.intersectObjects(world.chunkMeshes);
-    if (others.length > 0) {
-      return others[0];
+    try { // when players load in, sometimes player update is called before world is loaded
+      const others = this.playerRaycast.intersectObjects(world.chunkMeshes);
+      if (others.length > 0) {
+        return others[0];
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  trySetBlock(mouseEvent, newbId) {
+    // using the preview block location, try to set id of block
+    if (this.buildDistance < this.previewBlockMesh.position.distanceTo(this.character.mesh.position)) return;
+    const worldPos = this.previewBlockMesh.position.toArray();
+    if (world.bData[worldPos[0], worldPos[1], worldPos[2]] != null) {
+      world.bData[worldPos[0]][worldPos[1]][worldPos[2]] = newbId;
+      // after setting block, send data to server and refresh chunk geometry
+      const chunkPos = world.getChunkPosFromWorldPos(worldPos);
+      world.sendSingleBlockData(chunkPos);
+      world.refreshChunkGeometry(chunkPos);
     }
   }
 
   update(dt) {
+    // depending on player build mode, do different actions on click
     const mousePoint = this.doPlayerPointerRaycast();
-    if (mousePoint != null) { // if hit terrain
-      if (!this.previewBlockInScene) { // add preview block to scene
-        this.previewBlockInScene = true;
-        scene.add(this.previewBlockMesh);
-      }
-      this.previewBlockMesh.position.set(
-        Math.round(mousePoint.point.x + mousePoint.normal.x * 0.1), 
-        Math.round(mousePoint.point.y + mousePoint.normal.y * 0.1), 
-        Math.round(mousePoint.point.z + mousePoint.normal.z * 0.1));
-      if (this.previewBlockMesh.position.distanceTo(this.character.mesh.position) > this.buildDistance) {
-        this.previewBlockMesh.material = this.previewBlockMaterialIllegal;
-      } else {
-        this.previewBlockMesh.material = this.previewBlockMaterialLegal;
-      }
-    } else { // didn't hit anything
-      if (this.previewBlockInScene) { // remove preview block from scene
-        this.previewBlockInScene = false;
-        scene.remove(this.previewBlockMesh);
-      }
+    switch (this.mode) {
+      case this.MODE_BUILD:
+
+        // display block preview
+        if (mousePoint != null) { // if hit terrain
+          if (!this.previewBlockInScene) { // add preview block to scene
+            this.previewBlockInScene = true;
+            scene.add(this.previewBlockMesh);
+          }
+          this.previewBlockMesh.position.set(
+            Math.round(mousePoint.point.x + mousePoint.normal.x * 0.1),
+            Math.round(mousePoint.point.y + mousePoint.normal.y * 0.1),
+            Math.round(mousePoint.point.z + mousePoint.normal.z * 0.1));
+          if (this.previewBlockMesh.position.distanceTo(this.character.mesh.position) > this.buildDistance) {
+            this.previewBlockMesh.material = this.previewBlockMaterialIllegal;
+          } else {
+            this.previewBlockMesh.material = this.previewBlockMaterialLegal;
+          }
+        } else { // didn't hit anything
+          if (this.previewBlockInScene) { // remove preview block from scene
+            this.previewBlockInScene = false;
+            scene.remove(this.previewBlockMesh);
+          }
+        }
+        break;
+
+      case this.MODE_DELETE:
+
+        // display destroying block preview
+        if (mousePoint != null) { // if hit terrain
+          if (!this.previewBlockInScene) { // add preview block to scene
+            this.previewBlockInScene = true;
+            scene.add(this.previewBlockMesh);
+          }
+          this.previewBlockMesh.position.set(
+            Math.round(mousePoint.point.x - mousePoint.normal.x * 0.1),
+            Math.round(mousePoint.point.y - mousePoint.normal.y * 0.1),
+            Math.round(mousePoint.point.z - mousePoint.normal.z * 0.1));
+          this.previewBlockMesh.material = this.previewBlockMaterialIllegal;
+        } else if (this.previewBlockInScene) { // didn't hit anything
+          // remove preview block from scene
+          this.previewBlockInScene = false;
+          scene.remove(this.previewBlockMesh);
+        }
+        break;
     }
   }
 }
@@ -812,9 +447,8 @@ function initGame() {
 
 function runGame() {
   // basic world setup
-  //const camera = new THREE.OrthographicCamera(-20, 20, 15, -15, 0.1, 100);
   const camera = new THREE.PerspectiveCamera(75, 8 / 6, 0.1, 100);
-  let cameraOffset = new THREE.Vector3(10, 5, 0);
+  let cameraOffset = new THREE.Vector3(12, 8, 0);
   let cameraOrigin = new THREE.Vector3();
   let camOffsetRotation = 0;
 
@@ -843,7 +477,6 @@ function runGame() {
   updateObjects.set("clientPlayer", clientPlayer);
 
   // add input reactions
-  let keyManager = new KeyManager();
   updateObjects.set("keyManager", keyManager);
 
   keyManager.addKey("KeyW", {
@@ -915,8 +548,8 @@ function runGame() {
     downFunction: dt => {
       camOffsetRotation += 3 * dt;
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("KeyE", {
@@ -924,8 +557,8 @@ function runGame() {
     downFunction: dt => {
       camOffsetRotation -= 3 * dt;
     },
-    pressCallback: () => { },
-    upCallback: () => { },
+    pressCallback: () => {},
+    upCallback: () => {},
   });
 
   keyManager.addKey("Space", {
