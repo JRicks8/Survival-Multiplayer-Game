@@ -203,6 +203,36 @@ class World {
     }
   }
 
+  // on chunk data changed on server
+  setupChunkUpdateListeners() {
+    this.forEachChunk((x, y, z) => {
+      database.ref(`world/chunk_${x}_${y}_${z}`).on("value", (snapshot) => {
+        if (snapshot.exists()) {
+          // update block data with new chunk information
+          const chunkData = snapshot.val();
+          // for each block inside of local bData in the chunk range
+          for (let bx = x * this.chunkSize; bx < x * this.chunkSize + this.chunkSize; bx++) {
+            for (let by = y * this.chunkSize; by < y * this.chunkSize + this.chunkSize; by++) {
+              for (let bz = z * this.chunkSize; bz < z * this.chunkSize + this.chunkSize; bz++) {
+                // get the block position local to chunk origin
+                const localBlockPos = [bx % this.chunkSize, by % this.chunkSize, bz % this.chunkSize];
+                // set local bData to new bData in chunk
+                this.bData[bx][by][bz] = chunkData[
+                  localBlockPos[0] + 
+                  localBlockPos[1] * this.chunkSize + 
+                  localBlockPos[2] * this.chunkSize * this.chunkSize
+                ];
+              }
+            }
+          }
+
+          // after updating all of the blocks in the chunk, refresh the chunk geometry
+          this.refreshChunkGeometry([x, y, z]);
+        }
+      });
+    });
+  }
+
   // sends data of ENTIRE WORLD
   // ONLY USE when generating a new world.
   async sendWorldData() {
@@ -211,7 +241,9 @@ class World {
     // seed (int)
     // Size [w, h, d] (arr)
     // chunk_X_Y_Z
-    // block data [X, Y, Z, ID#, X, Y, Z, ID#] (multiple blocks stored into one array for efficient storage)
+    //  block data [ID#, ID#] 
+    //  (multiple blocks stored into one array for efficient storage)
+    //  (1d array in database converted to 3d array in data processing)
     // END
 
     database.ref(`world`).set(null); // erase all
@@ -237,15 +269,12 @@ class World {
         for (let z = 0; z < this.depth; z++) {
           const block = this.bData[x][y][z];
           const chunkPos = this.getChunkPosFromWorldPos([x,y,z]);
-          const dataStride = 4;
-          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(this.chunkSize * this.chunkSize * this.chunkSize * dataStride);
+          // if data at chunk pos doesn't exist yet, create data
+          if (chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] == null) chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]] = new Uint8Array(this.chunkSize * this.chunkSize * this.chunkSize);
           // chunkdata is a typed 1d array, so we need to map 3d coordinates to fit in a 1d array. cannot use .push()
           let localpos = [x % this.chunkSize, y % this.chunkSize, z % this.chunkSize]; // get position of block local to chunk origin
-          let i = (localpos[0] + localpos[1] * this.chunkSize + localpos[2] * this.chunkSize * this.chunkSize) * dataStride; // map local position to index in chunk data
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i] = x;
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 1] = y;
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 2] = z;
-          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i + 3] = block;
+          let i = localpos[0] + localpos[1] * this.chunkSize + localpos[2] * this.chunkSize * this.chunkSize; // map local position to index in chunk data
+          chunkArr[chunkPos[0]][chunkPos[1]][chunkPos[2]][i] = block;
         }
       }
     }
@@ -263,7 +292,6 @@ class World {
   // gets world data from server
   async retrieveWorldData() {
     // for each chunk
-    const dataStride = 4;
     await database.ref(`world`).get().then((snapshot) => {
       if (snapshot.exists()) {
         this.seed = snapshot.child("seed").val();
@@ -274,11 +302,18 @@ class World {
 
         this.forEachChunk((x, y, z) => {
           const chunkData = snapshot.child(`chunk_${x}_${y}_${z}`).val();
-          for (let i = 0; i < chunkData.length; i += dataStride) {
-            let pos = [chunkData[i], chunkData[i + 1], chunkData[i + 2]];
-            this.bData[pos[0]][pos[1]][pos[2]] = chunkData[i + 3];
+          for (let i = 0; i < chunkData.length; i++) {
+            // convert 1d data array to 3d array coords
+            const blockPos = new Array(3);
+            let tempIndex = i + 0;
+            blockPos[2] = Math.floor(tempIndex / (this.chunkSize * this.chunkSize) + z * this.chunkSize);
+            tempIndex -= (blockPos[2] - z * this.chunkSize) * this.chunkSize * this.chunkSize;
+            blockPos[1] = Math.floor(tempIndex / this.chunkSize) + y * this.chunkSize;
+            tempIndex -= (blockPos[1] - y * this.chunkSize) * this.chunkSize;
+            blockPos[0] = tempIndex + x * this.chunkSize;
+            this.bData[blockPos[0]][blockPos[1]][blockPos[2]] = chunkData[i];
           }
-        })
+        });
       }
     });
   }
@@ -287,6 +322,8 @@ class World {
     for (let i = 0; i < this.chunkMeshes.length; i++) {
       s.add(this.chunkMeshes[i]);
     }
+
+    this.setupChunkUpdateListeners();
   }
 
   createChunkMeshes() {
@@ -308,7 +345,7 @@ class World {
       // don't check for the bottom neighbor because of camera constraints
 
       if (block === BLOCK_AIR) return; // don't render air blocks
-
+      
       // convert chunk position to chunk 2d array index
       let i = this.getChunkMeshIndexFromWorldPos([x, y, z]);
       if (x + 1 === this.width) { // right face exposed to edge
@@ -395,8 +432,11 @@ class World {
 
   // updates chunk mesh from block data
   refreshChunkGeometry(chunkPos) {
+    // check that the chunk position is valid
+    try {
+      this.bData[this.chunkSize * chunkPos[0]][this.chunkSize * chunkPos[1]][this.chunkSize * chunkPos[2]] == null
+    } catch { return; }
     // I need a vertex array of all verts that I need to render in a chunk
-    const chunkMat = new THREE.MeshLambertMaterial({map: blockSpriteSheet});
     let chunkVertexBuffer = [];
     let chunkIndexBuffer = [];
     const chunkGeo = new THREE.BufferGeometry();
@@ -495,6 +535,16 @@ class World {
     const chunkDataRef = database.ref(`world/chunk_${chunkPos[0]}_${chunkPos[1]}_${chunkPos[2]}`);
     await chunkDataRef.get().then((snapshot) => {
       if (snapshot.exists()) {
+        let chunkData = snapshot.val();
+        const localBlockPos = [
+          blockPos[0] % this.chunkSize, 
+          blockPos[1] % this.chunkSize, 
+          blockPos[2] % this.chunkSize
+        ];
+        // convert local block position to 1d array index
+        const index = localBlockPos[0] + localBlockPos[1] * this.chunkSize + localBlockPos[2] * this.chunkSize * this.chunkSize;
+        chunkData[index] = this.bData[blockPos[0]][blockPos[1]][blockPos[2]];
+        chunkDataRef.set(chunkData);
       }
     });
   }

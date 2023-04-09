@@ -66,10 +66,6 @@ class Character {
     this.mesh.position.set(x, y, z);
   }
 
-  getPosition() {
-    return this.mesh.position.toArray();
-  }
-
   doCharacterCollisionRaycast(origin, direction, far, objects, onHit) {
     this.characterRaycast.set(origin, direction);
     this.characterRaycast.far = far;
@@ -153,8 +149,12 @@ class Character {
       newPos.add(zComp.clone().multiplyScalar(other.distance - far));
     });
 
-    // simulate drag
+    // sometimes threejs returns nan values for their functions (why? I don't know!)
+    // so we gotta filter that out here or firebase will yell at me for sending nan values
+    // to the server
+    if (isNaN(newPos.x) || isNaN(newPos.y) || isNaN(newPos.z)) return;
     this.setPosition(newPos.x, newPos.y, newPos.z);
+    // simulate drag
     this.velocity.multiply(new THREE.Vector3(0.2, 1, 0.2));
   }
 
@@ -248,6 +248,7 @@ class Player {
     }
   }
 
+  // try to set the block's block id if within build range
   trySetBlock(mouseEvent, newbId) {
     // using the preview block location, try to set id of block
     if (this.buildDistance < this.previewBlockMesh.position.distanceTo(this.character.mesh.position)) return;
@@ -256,8 +257,25 @@ class Player {
       world.bData[worldPos[0]][worldPos[1]][worldPos[2]] = newbId;
       // after setting block, send data to server and refresh chunk geometry
       const chunkPos = world.getChunkPosFromWorldPos(worldPos);
-      world.sendSingleBlockData(chunkPos);
+      world.sendSingleBlockData(chunkPos, worldPos);
       world.refreshChunkGeometry(chunkPos);
+
+      // then check if we need to refresh adjacent chunk geometries too
+      if (worldPos[0] === chunkPos[0] * world.chunkSize) {
+        world.refreshChunkGeometry([chunkPos[0] - 1, chunkPos[1], chunkPos[2]]);
+      } else if (worldPos[0] === chunkPos[0] * world.chunkSize + world.chunkSize - 1) {
+        world.refreshChunkGeometry([chunkPos[0] + 1, chunkPos[1], chunkPos[2]]);
+      }
+      if (worldPos[1] === chunkPos[1] * world.chunkSize) {
+        world.refreshChunkGeometry([chunkPos[0], chunkPos[1] - 1, chunkPos[2]]);
+      } else if (worldPos[1] === chunkPos[1] * world.chunkSize + world.chunkSize - 1) {
+        world.refreshChunkGeometry([chunkPos[0], chunkPos[1] + 1, chunkPos[2]]);
+      }
+      if (worldPos[2] === chunkPos[2] * world.chunkSize) {
+        world.refreshChunkGeometry([chunkPos[0], chunkPos[1], chunkPos[2] - 1]);
+      } else if (worldPos[2] === chunkPos[2] * world.chunkSize + world.chunkSize - 1) {
+        world.refreshChunkGeometry([chunkPos[0], chunkPos[1], chunkPos[2] + 1]);
+      }
     }
   }
 
@@ -328,16 +346,14 @@ function resetGameGlobals() {
 }
 
 // database management
-function sendCharacterInformation() {
+function sendClientInformation() {
   if (loggingOut) return;
-  let characterData = {
-    position: clientCharacter.mesh.position.toArray(),
-  };
   let updates = {};
-  updates[`characters/${clientUid}`] = characterData;
+  updates[`characters/${clientUid}/position`] = clientCharacter.mesh.position.toArray();
 
   // final check before sending
-  if (database.ref(`characters/${clientUid}`) == null || database.ref(`players/${clientUid}`) == null) {
+  if (database.ref(`characters/${clientUid}`) == null 
+  || database.ref(`players/${clientUid}`) == null) {
     console.log("no character and/or player ref in database!");
     return;
   }
@@ -420,7 +436,6 @@ function initGame() {
           console.log("DELETING PLAYER CHARACTER:", lastId);
           console.log("client:", clientUid);
           const char = otherCharacters.get(lastId);
-          console.log(char);
 
           char.removeFromScene(scene); // remove char from scene and delete ref
           otherCharacters.delete(lastId);
@@ -572,14 +587,15 @@ function runGame() {
 
   // aux variables
   let lastTime = Date.now();
+  let updateCharacterTimer = 0.2;
 
   function gameLoop() {
     requestAnimationFrame(gameLoop);
 
-    // dt
+    // delta time
     let dt = (Date.now() - lastTime) / 1000;
     lastTime = Date.now();
-
+    
     // update objects
     for (const val of updateObjects.values()) {
       val.update(dt);
@@ -590,9 +606,13 @@ function runGame() {
     let adjustedOffset = cameraOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), camOffsetRotation);
     camera.position.addVectors(cameraOrigin, adjustedOffset); // set position to origin + offset
     camera.lookAt(cameraOrigin);
-
-    // send information to the server
-    sendCharacterInformation();
+    
+    // update character on server periodically
+    if (updateCharacterTimer <= 0) {
+      updateCharacterTimer = 0.2;
+      sendClientInformation();
+    }
+    updateCharacterTimer -= dt;
 
     renderer.render(scene, camera);
   }
